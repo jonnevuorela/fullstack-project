@@ -1,0 +1,40 @@
+{{define "base"}}
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com;"
+    />
+    <meta name="theme-color" content="#000000" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <title>{{template "title" .}} - Fullstack projekti</title>
+    <link rel="stylesheet" href="/static/main.css" />
+    <link rel="shortcut icon" href="/static/favicon.ico" types="image/x-icon" />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css?family=Ubuntu+Mono:400,700"
+    />
+  </head>
+  <body>
+
+   <header>
+      <h1><a href='/'>Fullstack</a></h1>
+   </header>
+   {{template "nav" .}}
+   <main>
+      {{with .Flash}}
+         <div class='flash'>{{.}}</div>
+      {{end}}
+      {{template "main" .}}
+   </main>
+   <footer>
+    <p>&copy; Jonne Vuorela {{currentYear}}</p>
+   </footer>
+   <script src="/static/js/main.js" type="text/javascript"></script>
+</body>
+
+</html> 
+{{end}}
