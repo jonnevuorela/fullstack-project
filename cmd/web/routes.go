@@ -3,6 +3,8 @@ package main
 import (
 	"net/http"
 
+	"fullstack-project.jonnevuorela.com/ui"
+
 	"github.com/julienschmidt/httprouter"
 	"github.com/justinas/alice"
 )
@@ -15,13 +17,15 @@ func (app *application) routes() http.Handler {
 		app.notFound(w)
 	})
 
+	fileServer := http.FileServer(http.FS(ui.Files))
+	router.Handler(http.MethodGet, "/static/*filepath", fileServer)
+
 	router.HandlerFunc(http.MethodGet, "/ping", ping)
 
-	router.Handler(http.MethodGet, "/", dynamic.ThenFunc(app.home))
+	dynamic := alice.New(app.sessionManager.LoadAndSave, noSurf)
 
-	protected := dynamic.Append(app.requireAuthentication)
+	router.Handler(http.MethodGet, "/", dynamic.ThenFunc(app.home))
 
 	standard := alice.New(app.recoverPanic, app.logRequest, secureHeaders)
 	return standard.Then(router)
 }
-

@@ -1,12 +1,7 @@
 package main
 
 import (
-	"errors"
-	"fmt"
 	"net/http"
-	"strconv"
-
-	"github.com/julienschmidt/httprouter"
 )
 
 func (app *application) home(writer http.ResponseWriter, request *http.Request) {

@@ -7,12 +7,15 @@ import (
 	"net/http"
 	"os"
 	"time"
+
+	"github.com/alexedwards/scs/v2"
 )
 
 type application struct {
-	errorLog      *log.Logger
-	infoLog       *log.Logger
-	templateCache map[string]*template.Template
+	errorLog       *log.Logger
+	infoLog        *log.Logger
+	templateCache  map[string]*template.Template
+	sessionManager *scs.SessionManager
 }
 
 func main() {
@@ -26,10 +29,15 @@ func main() {
 		errorLog.Fatal(err)
 	}
 
+	sessionManager := scs.New()
+	sessionManager.Lifetime = 12 * time.Hour
+
+	sessionManager.Cookie.Secure = true
 	app := &application{
-		errorLog:      errorLog,
-		infoLog:       infoLog,
-		templateCache: templateCache,
+		errorLog:       errorLog,
+		infoLog:        infoLog,
+		templateCache:  templateCache,
+		sessionManager: sessionManager,
 	}
 
 	srv := &http.Server{
