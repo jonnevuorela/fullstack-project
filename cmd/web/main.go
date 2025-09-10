@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"html/template"
 	"log"
 	"net/http"
 	"os"
@@ -9,8 +10,9 @@ import (
 )
 
 type application struct {
-	errorLog *log.Logger
-	infoLog  *log.Logger
+	errorLog      *log.Logger
+	infoLog       *log.Logger
+	templateCache map[string]*template.Template
 }
 
 func main() {
@@ -19,9 +21,15 @@ func main() {
 	infoLog := log.New(os.Stdout, "\033[42;30mINFO\033[0m\t", log.Ldate|log.Ltime)
 	errorLog := log.New(os.Stderr, "\033[41;30mERROR\033[0m\t", log.Ldate|log.Ltime|log.Lshortfile)
 
+	templateCache, err := newTemplateCache()
+	if err != nil {
+		errorLog.Fatal(err)
+	}
+
 	app := &application{
-		errorLog: errorLog,
-		infoLog:  infoLog,
+		errorLog:      errorLog,
+		infoLog:       infoLog,
+		templateCache: templateCache,
 	}
 
 	srv := &http.Server{
@@ -31,4 +39,8 @@ func main() {
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 10 * time.Second,
 	}
+
+	infoLog.Printf("Starting server on http://localhost%s", *addr)
+	err = srv.ListenAndServe()
+	errorLog.Fatal(err)
 }
