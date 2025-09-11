@@ -13,6 +13,7 @@ type templateData struct {
 	CurrentYear int
 	Form        any
 	Flash       string
+	CSRFToken   string
 }
 
 var functions = template.FuncMap{
