@@ -9,6 +9,10 @@ import (
 	"time"
 
 	"github.com/alexedwards/scs/v2"
+
+	_ "github.com/go-sql-driver/mysql"
+
+	"github.com/gorilla/websocket"
 )
 
 type application struct {
@@ -16,6 +20,7 @@ type application struct {
 	infoLog        *log.Logger
 	templateCache  map[string]*template.Template
 	sessionManager *scs.SessionManager
+	upgrader       websocket.Upgrader
 }
 
 func main() {
@@ -29,6 +34,14 @@ func main() {
 		errorLog.Fatal(err)
 	}
 
+	var upgrader = websocket.Upgrader{
+		ReadBufferSize:  1024,
+		WriteBufferSize: 1024,
+		CheckOrigin: func(r *http.Request) bool {
+			return true
+		},
+	}
+
 	sessionManager := scs.New()
 	sessionManager.Lifetime = 12 * time.Hour
 
@@ -38,6 +51,8 @@ func main() {
 		infoLog:        infoLog,
 		templateCache:  templateCache,
 		sessionManager: sessionManager,
+
+		upgrader: upgrader,
 	}
 
 	srv := &http.Server{
