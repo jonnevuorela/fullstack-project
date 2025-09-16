@@ -1,7 +1,16 @@
-{{define "title"}}Home{{end}} 
+{{define "title"}}Car MMO{{end}} 
 {{define "main"}}
-    <title>Car MMO</title>
-    <link rel="stylesheet" href="/static/css/main.css">
-    <canvas id="gameCanvas" width="800" height="600"></canvas>
-    <script type="module" src="/static/js/game.bundle.js"></script>
+    <div class="game-container">
+        <div id="gameCanvas"></div>
+        <div class="game-controls">
+            <h3>Controls:</h3>
+            <p>W/Arrow Up: Accelerate</p>
+            <p>S/Arrow Down: Brake</p>
+            <p>A/Arrow Left: Steer Left</p>
+            <p>D/Arrow Right: Steer Right</p>
+            <p>Space: Handbrake</p>
+        </div>
+    </div>
+    <script nonce="{{.Nonce}}">const playerId = "{{.PlayerID}}";</script>
+    <script type="module" nonce="{{.Nonce}}" src="/static/game/game.bundle.js"></script>
 {{end}}
