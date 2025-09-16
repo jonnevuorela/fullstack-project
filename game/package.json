@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "jolt-physics": "^0.37.0",
     "three": "^0.169.0"
   },
   "devDependencies": {
