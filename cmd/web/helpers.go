@@ -46,10 +46,13 @@ func (app *application) render(w http.ResponseWriter, status int, page string, d
 }
 
 func (app *application) newTemplateData(r *http.Request) *templateData {
+	nonce, _ := r.Context().Value("nonce").(string)
 	return &templateData{
 		CurrentYear: time.Now().Year(),
 		Flash:       app.sessionManager.PopString(r.Context(), "flash"),
 		CSRFToken:   nosurf.Token(r),
+		PlayerID:    123, // placeholder
+		Nonce:       nonce,
 
 		//IsAuthenticated: app.isAuthenticated(r),
 	}

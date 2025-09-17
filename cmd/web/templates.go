@@ -14,6 +14,8 @@ type templateData struct {
 	Form        any
 	Flash       string
 	CSRFToken   string
+	PlayerID    int
+	Nonce       string
 }
 
 var functions = template.FuncMap{
