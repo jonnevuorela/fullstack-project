@@ -35,8 +35,8 @@ canvas {
 
 .game-container {
   position: relative;
-  width: 100%;
-  height: 100vh;
+  width: 80%;
+  height: calc((80%*16)/9);
 }
 
 #gameCanvas {
@@ -60,6 +60,7 @@ canvas {
   position: absolute;
   left: 0; top: 0; right: 0; bottom: 0;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
+  height: 20%;
   background-color: rgba(0, 0, 0, 0.3);
   color: white;
   border-radius: 8px;
