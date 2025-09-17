@@ -1,3 +1,4 @@
+// AI generoitu vite config
 import { defineConfig } from 'vite';
 import path from 'path';
 import { copyFileSync, existsSync, mkdirSync } from 'fs';
@@ -18,32 +19,30 @@ function wasmPlugin() {
    };
 }
 
-function copyWasmFiles() {
+function copyJoltFiles() {
    return {
-      name: 'copy-wasm-files',
+      name: 'copy-jolt-files',
       writeBundle() {
          const targetDir = path.resolve(__dirname, '../ui/static/game/assets');
-         console.log('Target directory:', targetDir);
          if (!existsSync(targetDir)) {
-            console.log('Creating target directory:', targetDir);
             mkdirSync(targetDir, { recursive: true });
          }
-         const wasmFiles = [
+
+         const filesToCopy = [
             'jolt-physics.wasm.wasm',
-            'jolt-physics.multithread.wasm.wasm'
+            'jolt-physics.wasm.js',
          ];
-         wasmFiles.forEach(file => {
+
+         filesToCopy.forEach(file => {
             const source = path.resolve(__dirname, `node_modules/jolt-physics/dist/${file}`);
             const dest = path.resolve(targetDir, file);
-            console.log(`Checking source: ${source}`);
             if (existsSync(source)) {
-               console.log(`Copying ${source} to ${dest}`);
+               console.log(`Copying ${file} to assets directory`);
                copyFileSync(source, dest);
             } else {
-               console.warn(`Warning: Could not find ${source}`);
+               console.warn(`Warning: Could not find ${file}`);
             }
          });
-         console.log('WASM files copied to static directory');
       }
    };
 }
@@ -57,7 +56,7 @@ export default defineConfig({
          output: {
             entryFileNames: 'game.bundle.js',
             format: 'es',
-            assetFileNames: 'assets/[name]-[hash][extname]',
+            assetFileNames: 'assets/[name][extname]',
             chunkFileNames: 'chunks/[name]-[hash].js',
          },
       },
@@ -66,11 +65,12 @@ export default defineConfig({
    resolve: {
       alias: {
          '@': path.resolve(__dirname, 'src'),
+         'jolt-physics': path.resolve(__dirname, 'node_modules/jolt-physics')
       },
    },
    optimizeDeps: {
       exclude: ['jolt-physics'],
    },
-   plugins: [wasmPlugin(), copyWasmFiles()],
+   plugins: [wasmPlugin(), copyJoltFiles()],
    publicDir: 'public',
 });
