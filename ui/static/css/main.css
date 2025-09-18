@@ -44,6 +44,27 @@ canvas {
   height: 100%;
   display: block;
 }
+.game-overlay.rpm-display {
+   position: absolute;
+   top: 20px;
+   right: 20px;
+   z-index: 1000;
+   pointer-events: none;
+   font-family: 'Arial', sans-serif;
+   color: #ffffff;
+   text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+   font-size: 24px;
+   font-weight: bold;
+   background: rgba(0, 0, 0, 0.5);
+   padding: 10px;
+   border-radius: 5px;
+   min-width: 100px;
+   text-align: center;
+}
+
+#rpm-value {
+   display: block;
+}
 
 .game-controls {
   position: absolute;
