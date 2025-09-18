@@ -1,16 +1,15 @@
+// Tässä on käytetty pohjana Jolt fysiikkakirjaston javascript binding repon
+// wheeled vehicle esimerkkiä, joka löytyy osoitteesta
+// https://github.com/jrouwe/JoltPhysics.js/blob/main/Examples/vehicle_wheeled.html#L165
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 
 import initJolt from 'jolt-physics';
-
+import { materialReference } from 'three/src/nodes/TSL.js';
 
 const LAYER_NON_MOVING = 0;
 const LAYER_MOVING = 1;
 const NUM_LAYERS = 2;
-
-const BP_LAYER_NON_MOVING = 0;
-const BP_LAYER_MOVING = 1;
-const NUM_BROAD_PHASE_LAYERS = 2;
 
 const State = {
    READY: 0,
@@ -20,20 +19,14 @@ const State = {
 
 class Game {
    constructor() {
+      // core
       this.scene = null;
       this.camera = null;
       this.renderer = null;
+      this.texLoader = null;
       this.clock = null;
-      this.controls = null;
-      this.vehicle = null;
 
-      this.keyState = {};
-      this.playerId = window.playerId || 123;
-
-      this.state = State.LOADING;
-      this.overlay = null;
-      this.canvasContainer = document.getElementById('gameCanvas');
-
+      // physics
       this.Jolt = null;
       this.joltInterface = null;
       this.physicsSystem = null;
@@ -42,12 +35,34 @@ class Game {
       this.tempVec = null;
       this.tempRVec = null;
       this.tempQuat = null;
-
       this.dynamicObjects = [];
       this.staticObjects = [];
+
+      // ui
+      this.state = State.LOADING;
+      this.overlay = null;
+      this.canvasContainer = document.getElementById('gameCanvas');
+      this.uiOverlay = null;
+      this.currentRPM = 0;
+
+      // player
+      this.controls = null;
+      this.playerController = null;
+      this.keyState = {};
+      this.playerId = window.playerId || 123;
+
+      // vehicle physics and rendering
+      this.vehicle = null;
+      this.vehicleBody = null;
       this.vehicleMesh = null;
+      this.vehicleWheels = [];
+      this.vehicleStepListener = null;
+
+      // vehicle setup
+      this.vehicleEngine = null;
+      this.vehicleTransmission = null;
+
       this.groundMesh = null;
-      this.wheelMeshes = [];
       this.track = [
          // track
          [
@@ -284,11 +299,15 @@ class Game {
          });
 
          const settings = new this.Jolt.JoltSettings();
-         settings.mMaxWorkerThreads = 0;
+         settings.mMaxWorkerThreads = 3;
 
          const objectFilter = new this.Jolt.ObjectLayerPairFilterTable(NUM_LAYERS);
          objectFilter.EnableCollision(LAYER_NON_MOVING, LAYER_MOVING);
          objectFilter.EnableCollision(LAYER_MOVING, LAYER_MOVING);
+
+         const BP_LAYER_NON_MOVING = new this.Jolt.BroadPhaseLayer(0);
+         const BP_LAYER_MOVING = new this.Jolt.BroadPhaseLayer(1);
+         const NUM_BROAD_PHASE_LAYERS = 2;
 
          const bpInterface = new this.Jolt.BroadPhaseLayerInterfaceTable(NUM_LAYERS, NUM_BROAD_PHASE_LAYERS);
          bpInterface.MapObjectToBroadPhaseLayer(LAYER_NON_MOVING, BP_LAYER_NON_MOVING);
@@ -348,11 +367,20 @@ class Game {
 
          this.controls = new OrbitControls(this.camera, this.renderer.domElement);
 
+
+         this.uiOverlay = document.createElement('div');
+         this.uiOverlay.id = 'ui-display';
+         this.uiOverlay.className = 'game-overlay ui-display';
+         this.uiOverlay.innerHTML = '<span id="rpm-value">0 RPM</span>';
+         this.canvasContainer.appendChild(this.uiOverlay);
+
          window.addEventListener('resize', () => {
             this.camera.aspect = window.innerWidth / window.innerHeight;
             this.camera.updateProjectionMatrix();
             this.renderer.setSize(window.innerWidth, window.innerHeight);
          });
+
+         this.texLoader = new THREE.TextureLoader();
       } catch (error) {
          console.error("Failed to initialize scene:", error);
          this.setState(State.ERROR, error.message);
@@ -360,7 +388,7 @@ class Game {
       }
    }
 
-   createAndAddBody(shapeSettings, position, rotation, motionType, layer, color) {
+   createAndAddBody(shapeSettings, position, rotation, motionType, layer, color, mass = 0, material = null) {
       try {
          const shape = shapeSettings.Create().Get();
          if (!shape) {
@@ -374,6 +402,10 @@ class Game {
             motionType,
             layer
          );
+         if (mass != 0 && motionType == this.Jolt.EMotionType_Dynamic) {
+            bodySettings.mOverrideMassProperties = this.Jolt.EOverrideMassProperties_CalculateInertia;
+            bodySettings.mMassPropertiesOverride.mMass = mass;
+         }
 
          const body = this.bodyInterface.CreateBody(bodySettings);
          if (!body) {
@@ -395,7 +427,13 @@ class Game {
             throw new Error("Failed to add body to physics system");
          }
 
-         const threeObject = this.getThreeObjectForBody(body, color);
+         let threeObject = null;
+         if (material == null) {
+            threeObject = this.getThreeObjectForBody(body, color);
+         } else {
+            threeObject = this.getThreeObjectForBody(body, color, material);
+         }
+
          threeObject.userData.body = body;
          this.scene.add(threeObject);
 
@@ -414,8 +452,8 @@ class Game {
       }
    }
 
-   getThreeObjectForBody(body, color) {
-      const material = new THREE.MeshPhongMaterial({ color: color });
+   getThreeObjectForBody(body, color, material = new THREE.MeshPhongMaterial({ color: color })
+   ) {
       let threeObject;
 
       const shape = body.GetShape();
@@ -483,7 +521,7 @@ class Game {
       this.setState(State.LOADING);
       console.log("Creating ground");
       try {
-         this.tempRVec.Set(0, -15, 0);
+         this.tempRVec.Set(0, -16, 0);
          this.tempQuat.Set(0, 0, 0, 1);
 
          const groundShapeSettings = new this.Jolt.BoxShapeSettings(
@@ -509,7 +547,6 @@ class Game {
          throw error;
       }
    }
-
 
    createTrack() {
       this.setState(State.LOADING);
@@ -543,6 +580,280 @@ class Game {
          console.log("Track created successfully");
       } catch (error) {
          console.error("Failed to create track:", error);
+         this.setState(State.ERROR, error.message);
+         throw error;
+      }
+   }
+
+   createVehicle() {
+      this.setState(State.LOADING);
+      console.log("Creating vehicle");
+
+      const wheelRadius = 0.9;
+      const wheelWidth = 0.9;
+
+      const halfVehicleLength = 4.445;
+      const halfVehicleWidth = 1.695;
+      const halfVehicleHeight = 0.5;
+      const wheelBase = halfVehicleLength / 1.76039604;
+
+      const wheelOffset = 0.5;
+      const wheelOffsetVertical = 0.18;
+
+      const suspensionMinLength = 0.15;
+      const suspensionMaxLength = 0.5;
+      const suspensionPreloadLenght = 0.7;
+      const suspensionStiffness = 10;
+      const suspensionDamping = 1;
+      const suspensionFrequency = 1;
+
+      const maxSteerAngle = this.degreesToRadians(50);
+
+      // LinearCurve multiplier
+      const frontTyreLateralFriction = 20;
+      const frontTyreLongitudalFriction = 10;
+
+      // LinearCurve multiplier
+      const rearTyreLateralFriction = 7;
+      const rearTyreLongitudalFriction = 20;
+
+      const transmissionMode = this.Jolt.ETransmissionMode_Auto;
+      const fourWheelDrive = false;
+      const torqueSplitRatio = 1.4;
+      const differentialLimitedSlipRatio = 10;
+      const antiRollbar = true;
+
+      const maxEngineTorque = 2000.0;
+      const clutchStrength = 100.0;
+      const minRPM = 400;
+      const maxRPM = 10000;
+      const damperMass = 1.0;
+      const flywheelMass = 1.0;
+
+      const vehicleMass = 1200.0;
+
+      const FL_WHEEL = 0;
+      const FR_WHEEL = 1;
+      const BL_WHEEL = 2;
+      const BR_WHEEL = 3;
+
+      const wheelRight = new this.Jolt.Vec3(0, 1, 0);
+      const wheelUp = new this.Jolt.Vec3(1, 0, 0);
+
+      const texture = this.texLoader.load('data:image/gif;base64,R0lGODdhAgACAIABAAAAAP///ywAAAAAAgACAAACA0QCBQA7');
+      texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+      texture.offset.set(0, 0);
+      texture.repeat.set(1, 1);
+      texture.magFilter = THREE.NearestFilter;
+      let wheelMaterial = new THREE.MeshPhongMaterial({ color: 0x666666 });
+      wheelMaterial.map = texture;
+
+      const createThreeWheel = (constraint, wheelIndex, body) => {
+         const joltWheel = constraint.GetWheel(wheelIndex);
+         const wheelSetting = joltWheel.GetSettings();
+         const wheel = new THREE.Mesh(new THREE.CylinderGeometry(wheelSetting.mRadius, wheelSetting.mRadius, wheelSetting.mWidth, 20, 1), wheelMaterial);
+         body.add(wheel);
+
+         wheel.updateLocalTransform = () => {
+            let transform = constraint.GetWheelLocalTransform(wheelIndex, wheelRight, wheelUp);
+            wheel.position.copy(this.wrapVec3(transform.GetTranslation()));
+            wheel.quaternion.copy(this.wrapQuat(transform.GetRotation().GetQuaternion()));
+         };
+         wheel.updateLocalTransform();
+
+         return wheel;
+      }
+
+      try {
+         const carShapeSettings = new this.Jolt.OffsetCenterOfMassShapeSettings(new this.Jolt.Vec3(0, -halfVehicleHeight, 0),
+            new this.Jolt.BoxShapeSettings(new this.Jolt.Vec3(halfVehicleWidth, halfVehicleHeight, halfVehicleLength)));
+
+         this.tempRVec.Set(10, 0, -30);
+         this.tempQuat.Set(0, 0, 0, 1);
+
+         const carBody = this.createAndAddBody(
+            carShapeSettings,
+            this.tempRVec,
+            this.tempQuat,
+            this.Jolt.EMotionType_Dynamic,
+            LAYER_MOVING,
+            0xff0000,
+            vehicleMass
+         );
+
+         this.vehicleMesh = this.dynamicObjects[this.dynamicObjects.length - 1];
+
+         const vehicle = new this.Jolt.VehicleConstraintSettings();
+         vehicle.mMaxPitchRollAngle = this.degreesToRadians(60);
+         vehicle.mWheels.clear();
+         const mWheels = [];
+         {
+            const frontLongitudinalCurve = new this.Jolt.LinearCurve();
+            frontLongitudinalCurve.AddPoint(0.05 * frontTyreLongitudalFriction, 1.2 * frontTyreLongitudalFriction);
+            frontLongitudinalCurve.Sort();
+
+
+            const frontLateralCurve = new this.Jolt.LinearCurve();
+            frontLateralCurve.AddPoint(0.1 * frontTyreLateralFriction, 1.15 * frontTyreLateralFriction);
+            frontLateralCurve.Sort();
+
+            const rearLongitudinalCurve = new this.Jolt.LinearCurve();
+            rearLongitudinalCurve.AddPoint(0.05 * rearTyreLongitudalFriction, 1.1 * rearTyreLongitudalFriction);
+            rearLongitudinalCurve.Sort();
+
+            const rearLateralCurve = new this.Jolt.LinearCurve();
+            rearLateralCurve.AddPoint(0.1 * rearTyreLateralFriction, 1.1 * rearTyreLateralFriction);
+            rearLateralCurve.Sort();
+
+            const fl = new this.Jolt.WheelSettingsWV();
+            fl.mPosition = new this.Jolt.Vec3((halfVehicleWidth + wheelOffset), -wheelOffsetVertical, wheelBase);
+            fl.set_mMaxSteerAngle(maxSteerAngle);
+            fl.mMaxHandBrakeTorque = 0.0;
+            fl.set_mLateralFriction(frontLateralCurve);
+            fl.set_mLongitudinalFriction(frontLongitudinalCurve);
+            vehicle.mWheels.push_back(fl);
+            mWheels.push(fl);
+
+            const fr = new this.Jolt.WheelSettingsWV();
+            fr.mPosition = new this.Jolt.Vec3(-(halfVehicleWidth + wheelOffset), -wheelOffsetVertical, wheelBase);
+            fr.set_mMaxSteerAngle(maxSteerAngle);
+            fr.mMaxHandBrakeTorque = 0.0;
+            fr.set_mLateralFriction(frontLateralCurve);
+            fr.set_mLongitudinalFriction(frontLongitudinalCurve);
+            vehicle.mWheels.push_back(fr);
+            mWheels.push(fr);
+
+            const bl = new this.Jolt.WheelSettingsWV();
+            bl.mPosition = new this.Jolt.Vec3((halfVehicleWidth + wheelOffset), -wheelOffsetVertical, -wheelBase);
+            bl.set_mMaxSteerAngle(0);
+            bl.set_mLateralFriction(rearLateralCurve);
+            bl.set_mLongitudinalFriction(rearLongitudinalCurve);
+            vehicle.mWheels.push_back(bl);
+            mWheels.push(bl);
+
+            const br = new this.Jolt.WheelSettingsWV();
+            br.mPosition = new this.Jolt.Vec3(-(halfVehicleWidth + wheelOffset), -wheelOffsetVertical, -wheelBase);
+            br.set_mMaxSteerAngle(0);
+            br.set_mLateralFriction(rearLateralCurve);
+            br.set_mLongitudinalFriction(rearLongitudinalCurve);
+            vehicle.mWheels.push_back(br);
+            mWheels.push(br);
+
+            this.Jolt.destroy(frontLateralCurve);
+            this.Jolt.destroy(frontLongitudinalCurve);
+            this.Jolt.destroy(rearLateralCurve);
+            this.Jolt.destroy(rearLongitudinalCurve);
+         }
+         mWheels.forEach(wheelS => {
+            wheelS.mRadius = wheelRadius;
+            wheelS.mWidth = wheelWidth;
+            wheelS.mSuspensionMinLength = suspensionMinLength;
+            wheelS.mSuspensionMaxLength = suspensionMaxLength;
+            // wheelS.set_mSuspensionPreloadLength(suspensionPreloadLenght);
+
+            // const spring = wheelS.get_mSuspensionSpring()
+            // spring.set_mStiffness(suspensionStiffness);
+            // spring.set_mFrequency(suspensionFrequency);
+            // spring.set_mDamping(suspensionDamping);
+         });
+
+         const controllerSettings = new this.Jolt.WheeledVehicleControllerSettings();
+
+         // Powertrain
+         const engine = controllerSettings.get_mEngine();
+         engine.set_mMinRPM(minRPM);
+         engine.set_mMaxRPM(maxRPM);
+         engine.set_mAngularDamping(damperMass);
+         engine.set_mInertia(flywheelMass);
+         engine.set_mMaxTorque(maxEngineTorque);
+
+         const transmission = controllerSettings.get_mTransmission();
+         transmission.set_mClutchStrength(clutchStrength);
+         transmission.set_mMode(transmissionMode);
+
+         vehicle.mController = controllerSettings;
+
+         // Rear differential
+         controllerSettings.mDifferentials.clear();
+         const rearWheelDrive = new this.Jolt.VehicleDifferentialSettings();
+         rearWheelDrive.mLeftWheel = BL_WHEEL;
+         rearWheelDrive.mRightWheel = BR_WHEEL;
+         rearWheelDrive.mLimitedSlipRatio = differentialLimitedSlipRatio;
+         controllerSettings.mDifferentials.push_back(rearWheelDrive);
+         rearWheelDrive.mEngineTorqueRatio = 1;
+
+         // 4WD settings
+         if (fourWheelDrive) {
+            // adjust rear
+            rearWheelDrive.mEngineTorqueRatio = 0.5;
+            controllerSettings.mDifferentialLimitedSlipRatio = torqueSplitRatio;
+
+            // add front
+            const frontWheelDrive = new this.Jolt.VehicleDifferentialSettings();
+            frontWheelDrive.mLeftWheel = FL_WHEEL;
+            frontWheelDrive.mRightWheel = FR_WHEEL;
+            frontWheelDrive.mLimitedSlipRatio = differentialLimitedSlipRatio;
+            frontWheelDrive.mEngineTorqueRatio = 0.5;
+            controllerSettings.mDifferentials.push_back(frontWheelDrive);
+         }
+
+         // Antirollbar
+         if (antiRollbar) {
+            vehicle.mAntiRollBars.clear();
+            const frontRollBar = new this.Jolt.VehicleAntiRollBar();
+            frontRollBar.mLeftWheel = FL_WHEEL;
+            frontRollBar.mRightWheel = FR_WHEEL;
+            const rearRollBar = new this.Jolt.VehicleAntiRollBar();
+            rearRollBar.mLeftWheel = BL_WHEEL;
+            rearRollBar.mRightWheel = BR_WHEEL;
+            vehicle.mAntiRollBars.push_back(frontRollBar);
+            vehicle.mAntiRollBars.push_back(rearRollBar);
+         }
+
+         this.vehicle = new this.Jolt.VehicleConstraint(carBody, vehicle);
+         const tester = new this.Jolt.VehicleCollisionTesterCastCylinder(LAYER_MOVING, 0.05);
+         this.vehicle.SetVehicleCollisionTester(tester);
+
+         this.vehicleBody = carBody;
+
+         const callbacks = new this.Jolt.VehicleConstraintCallbacksJS();
+         callbacks.GetCombinedFriction = (wheelIndex, tireFrictionDirection, tireFriction, body2, subShapeID2) => {
+            const otherBody = this.Jolt.wrapPointer(body2, this.Jolt.Body);
+            return Math.sqrt(tireFriction * otherBody.GetFriction());
+         };
+         callbacks.OnPreStepCallback = (vehicle, stepContext) => { };
+         callbacks.OnPostCollideCallback = (vehicle, stepContext) => { };
+         callbacks.OnPostStepCallback = (vehicle, stepContext) => { };
+         callbacks.SetVehicleConstraint(this.vehicle);
+         this.vehicleCallbacks = callbacks;
+
+         this.physicsSystem.AddConstraint(this.vehicle);
+         this.playerController = this.Jolt.castObject(this.vehicle.GetController(), this.Jolt.WheeledVehicleController);
+         this.vehicleEngine = this.playerController.GetEngine();
+         this.vehicleTransmission = this.playerController.GetTransmission();
+
+         const controllerCallbacks = new this.Jolt.WheeledVehicleControllerCallbacksJS();
+         controllerCallbacks.OnTireMaxImpulseCallback = (wheelIndex, result, suspensionImpulse,
+            longitudinalFriction, lateralFriction, longitudinalSlip, lateralSlip, deltaTime) => {
+            const resultObj = this.Jolt.wrapPointer(result, this.Jolt.TireMaxImpulseCallbackResult);
+            resultObj.mLongitudinalImpulse = longitudinalFriction * suspensionImpulse;
+            resultObj.mLateralImpulse = lateralFriction * suspensionImpulse;
+         };
+         controllerCallbacks.SetWheeledVehicleController(this.playerController);
+         this.controllerCallbacks = controllerCallbacks;
+
+         this.vehicleWheels = [];
+         for (let i = 0; i < vehicle.mWheels.size(); i++) {
+            this.vehicleWheels.push(createThreeWheel(this.vehicle, i, this.vehicleMesh));
+         }
+
+         const stepListener = new this.Jolt.VehicleConstraintStepListener(this.vehicle);
+         this.vehicleStepListener = this.physicsSystem.AddStepListener(stepListener);
+
+         console.log("Created vehicle with step listener");
+         return carBody;
+      } catch (error) {
+         console.error("Failed to create vehicle:", error);
          this.setState(State.ERROR, error.message);
          throw error;
       }
@@ -606,7 +917,7 @@ class Game {
       }
    }
 
-   processInput() {
+   prePhysicsUpdate() {
       if (!this.vehicle) return;
       try {
          const input = this.input;
@@ -616,8 +927,8 @@ class Game {
          right = input.rightPressed ? 1.0 : (input.leftPressed ? -1.0 : 0.0);
 
          if (this.previousForward * forward < 0.0) {
-            const rotation = this.wrapQuat(this.vehicle.chassisBody.GetRotation().Conjugated());
-            const linearV = this.wrapVec3(this.vehicle.chassisBody.GetLinearVelocity());
+            const rotation = this.wrapQuat(this.vehicleBody.GetRotation().Conjugated());
+            const linearV = this.wrapVec3(this.vehicleBody.GetLinearVelocity());
             const velocity = linearV.applyQuaternion(rotation).z;
 
             if ((forward > 0.0 && velocity < -0.1) || (forward < 0.0 && velocity > 0.1)) {
@@ -625,7 +936,7 @@ class Game {
                brake = 1.0;
             }
             else {
-               this.previousForward = forward;
+               this.previousForward = forward; // reversing after stopping
             }
          }
 
@@ -634,14 +945,17 @@ class Game {
             handBrake = 1.0;
          }
 
-         const controller = this.Jolt.castObject(this.vehicle.GetController(), this.Jolt.WheeledVehicleController);
-         controller.SetDriverInput(forward, right, brake, handBrake);
-
+         this.playerController.SetDriverInput(forward, right, brake, handBrake);
          if (right != 0.0 || forward != 0.0 || brake != 0.0 || handBrake != 0.0) {
-            this.bodyInterface.ActivateBody(this.vehicle.chassisBody.GetID());
+            this.bodyInterface.ActivateBody(this.vehicleBody.GetID());
          }
+
+         this.vehicleWheels.forEach(wheel => wheel.updateLocalTransform());
+         this.currentRPM = this.vehicleEngine.GetCurrentRPM();
+
+         this.uiOverlay.querySelector('#rpm-value').textContent = `${Math.round(this.currentRPM)} RPM`
       } catch (error) {
-         console.error("Failed to process input:", error);
+         console.error("Failed to process prePhysicsUpdate:", error);
          this.setState(State.ERROR, error.message);
       }
    }
@@ -651,40 +965,22 @@ class Game {
          if (!this.Jolt || !this.physicsSystem) {
             throw new Error("Physics system not initialized");
          }
-
          var numSteps = deltaTime > 1.0 / 55.0 ? 2 : 1;
-
          this.joltInterface.Step(deltaTime, numSteps);
 
-         for (const obj of this.dynamicObjects) {
-            for (let i = 0, il = this.dynamicObjects.length; i < il; i++) {
-               let objThree = this.dynamicObjects[i];
-               let body = objThree.userData.body;
-               obj.position.copy(this.wrapVec3(body.GetPosition()));
-               obj.quaternion.copy(this.wrapQuat(body.GetRotation()));
-
-
-               if (body.GetBodyType() == this.Jolt.EBodyType_SoftBody) {
-                  if (objThree.userData.updateVertex) {
-                     objThree.userData.updateVertex();
-                  } else {
-                     objThree.geometry = createMeshForShape(body.GetShape());
-                  }
+         for (let i = 0, il = this.dynamicObjects.length; i < il; i++) {
+            let objThree = this.dynamicObjects[i];
+            let body = objThree.userData.body;
+            objThree.position.copy(this.wrapVec3(body.GetPosition()));
+            objThree.quaternion.copy(this.wrapQuat(body.GetRotation()));
+            if (body.GetBodyType() == this.Jolt.EBodyType_SoftBody) {
+               if (objThree.userData.updateVertex) {
+                  objThree.userData.updateVertex();
+               } else {
+                  objThree.geometry = this.createMeshForShape(body.GetShape());
                }
             }
          }
-
-         if (this.vehicle && this.wheelMeshes.length > 0) {
-            for (let i = 0; i < this.wheelMeshes.length; i++) {
-               const wheel = this.vehicle.GetWheel(i);
-               const wheelTransform = wheel.GetWorldTransform();
-               const wheelMesh = this.wheelMeshes[i];
-
-               wheelMesh.position.copy(this.wrapVec3(wheelTransform.GetTranslation()));
-               wheelMesh.quaternion.copy(this.wrapQuat(wheelTransform.GetRotation()));
-            }
-         }
-
          return true;
       } catch (error) {
          console.error("Physics update failed:", error);
@@ -697,7 +993,7 @@ class Game {
 
       const deltaTime = this.clock.getDelta();
       try {
-         this.processInput();
+         this.prePhysicsUpdate();
 
          this.updatePhysics(deltaTime);
 
@@ -710,13 +1006,75 @@ class Game {
       }
    }
 
+   // AI:n tekemä, Create a recursive function that creates a pyramid out of cubes with createbody function. Grok 3
+   createPyramid(basePosition, layers = 10, cubeSize = 2.0, currentLayer = 0) {
+      if (currentLayer >= layers) {
+         return; // Base case: stop when all layers are built
+      }
+
+      // Calculate the number of cubes per side for this layer (decreasing pyramid)
+      const numCubesPerSide = layers - currentLayer;
+      const halfSide = (numCubesPerSide - 1) / 2.0;
+
+      // Compute the Y offset for this layer (stacking upward from base)
+      const layerYOffset = currentLayer * cubeSize;
+      const layerY = basePosition.GetY() + layerYOffset;
+
+      const texture = this.texLoader.load('static/gameAssets/box.jpeg');
+      texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+      texture.offset.set(0, 0);
+      texture.repeat.set(1, 1);
+      texture.magFilter = THREE.NearestFilter;
+      let material = new THREE.MeshPhongMaterial({ map: texture, color: 0xa9a9 });
+
+      // Generate cubes for this layer in a square grid
+      for (let x = 0; x < numCubesPerSide; x++) {
+         for (let z = 0; z < numCubesPerSide; z++) {
+            // Position each cube centered in the layer grid
+            const cubeX = basePosition.GetX() + (x - halfSide) * cubeSize;
+            const cubeZ = basePosition.GetZ() + (z - halfSide) * cubeSize;
+            const cubePos = new this.Jolt.RVec3(cubeX, layerY, cubeZ);
+
+            // Rotation (identity for upright cubes)
+            const cubeQuat = new this.Jolt.Quat(0, 0, 0, 1);
+
+            // Create box shape for the cube
+            const halfExtent = new this.Jolt.Vec3(cubeSize / 2, cubeSize / 2, cubeSize / 2);
+            const shapeSettings = new this.Jolt.BoxShapeSettings(halfExtent);
+
+            // Add as static body (for a stable pyramid; use Dynamic if interactive)
+            this.createAndAddBody(
+               shapeSettings,
+               cubePos,
+               cubeQuat,
+               this.Jolt.EMotionType_Dynamic,
+               LAYER_MOVING,
+               0x00ff00, // Green color for visibility
+               7,
+               material
+
+            );
+
+            // Cleanup resources
+            this.Jolt.destroy(shapeSettings);
+            this.Jolt.destroy(cubePos);
+            this.Jolt.destroy(cubeQuat);
+            this.Jolt.destroy(halfExtent);
+         }
+      }
+
+      // Recursive call for the next smaller layer
+      this.createPyramid(basePosition, layers, cubeSize, currentLayer + 1);
+   }
+
    createProps() {
       try {
          const shapeSettings = new this.Jolt.BoxShapeSettings(
-            new this.Jolt.Vec3(1, 1, 1)
+            new this.Jolt.Vec3(0.5, 3, 1)
          );
 
-         this.tempRVec.Set(0, 1, 0);
+
+         this.tempRVec.Set(10, 1, 5);
          this.tempQuat.Set(0, 0, 0, 1);
 
          const body = this.createAndAddBody(
@@ -747,7 +1105,11 @@ class Game {
          try { this.createGround(); } catch (e) { throw e }
          try { this.createTrack(); } catch (e) { throw e }
 
+         try { this.createVehicle(); } catch (e) { throw e }
          try { this.createProps(); } catch (e) { throw e }
+         this.tempRVec.Set(30, -10, -30)
+
+         try { this.createPyramid(this.tempRVec); } catch (e) { throw e }
 
          try { this.setupControls(); } catch (e) { throw e }
 
@@ -773,6 +1135,15 @@ class Game {
 
       if (this.physicsSystem && this.vehicleStepListener) {
          this.physicsSystem.RemoveStepListener(this.vehicleStepListener);
+      }
+
+      if (this.vehicle) {
+         this.physicsSystem.RemoveConstraint(this.vehicle);
+         this.Jolt.destroy(this.vehicle);
+      }
+
+      if (this.vehicleCallbacks) {
+         this.Jolt.destroy(this.vehicleCallbacks);
       }
 
       if (this.controllerCallbacks) {
@@ -806,13 +1177,18 @@ class Game {
       if (this.tempQuat) this.Jolt.destroy(this.tempQuat);
 
       this.vehicle = null;
-      this.clock = null;
+      this.vehicleWheels = [];
+
       this.vehicleStepListener = null;
+
       this.vehicleCallbacks = null;
       this.controllerCallbacks = null;
+
       this.dynamicObjects = [];
       this.staticObjects = [];
-      this.wheelMeshes = [];
+
+      this.clock = null;
+      this.texLoader = null;
       this.bodyInterface = null;
       this.physicsSystem = null;
       this.joltInterface = null;
