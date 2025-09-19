@@ -60,6 +60,8 @@ class Game {
       this.vehicle = null;
       this.vehicleBody = null;
       this.vehicleMesh = null;
+      this.wheelModelL = null;
+      this.wheelModelR = null;
       this.vehicleWheels = [];
       this.vehicleStepListener = null;
 
@@ -351,14 +353,14 @@ class Game {
       console.log("Initializing Three.js scene");
       try {
          this.scene = new THREE.Scene();
-         this.scene.background = new THREE.Color(0x88ccff);
+         this.scene.background = new THREE.Color(0xffd577);
 
-         this.scene.add(new THREE.AmbientLight(0x404040));
-         const dirLight = new THREE.DirectionalLight(0xffffff, 1);
-         dirLight.position.set(10, 10, 5);
+         this.scene.add(new THREE.AmbientLight(0x1f2a4d));
+         const dirLight = new THREE.DirectionalLight(0xffcc77, 2);
+         dirLight.position.set(10, 7, 5);
          this.scene.add(dirLight);
 
-         this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+         this.camera = new THREE.PerspectiveCamera(90, window.innerWidth / window.innerHeight, 0.1, 1000);
          this.camera.position.set(0, 15, 30);
          this.camera.lookAt(new THREE.Vector3(0, 0, 0));
 
@@ -539,7 +541,7 @@ class Game {
          this.tempQuat.Set(0, 0, 0, 1);
 
          const groundShapeSettings = new this.Jolt.BoxShapeSettings(
-            new this.Jolt.Vec3(200, 0.5, 200),
+            new this.Jolt.Vec3(20000, 0.5, 20000),
             0.05
          );
 
@@ -603,32 +605,33 @@ class Game {
       this.setState(State.LOADING);
       console.log("Creating vehicle");
 
-      const wheelRadius = 0.9;
-      const wheelWidth = 0.9;
+      const wheelRadius = 0.55;
+      const wheelWidth = 0.6;
 
       const halfVehicleLength = 4.445;
       const halfVehicleWidth = 1.695;
-      const halfVehicleHeight = 0.5;
-      const wheelBase = halfVehicleLength / 1.76039604;
+      const halfVehicleHeight = 0.1;
+      const wheelBase = halfVehicleLength / 1.83;
 
-      const wheelOffset = 0.5;
-      const wheelOffsetVertical = 0.18;
+      const wheelOffset = -0.2;
+      const wheelOffsetVertical = -0.67;
+      const wheelOffsetLongitudal = 0.4;
 
-      const suspensionMinLength = 0.15;
-      const suspensionMaxLength = 0.5;
+      const suspensionMinLength = 0.05;
+      const suspensionMaxLength = 0.3;
       const suspensionPreloadLenght = 0.7;
       const suspensionStiffness = 10;
       const suspensionDamping = 1;
       const suspensionFrequency = 1;
 
-      const maxSteerAngle = this.degreesToRadians(50);
+      const maxSteerAngle = this.degreesToRadians(55);
 
       // LinearCurve multiplier
       const frontTyreLateralFriction = 20;
-      const frontTyreLongitudalFriction = 10;
+      const frontTyreLongitudalFriction = 5;
 
       // LinearCurve multiplier
-      const rearTyreLateralFriction = 7;
+      const rearTyreLateralFriction = 5;
       const rearTyreLongitudalFriction = 20;
 
       const transmissionMode = this.Jolt.ETransmissionMode_Auto;
@@ -637,7 +640,7 @@ class Game {
       const differentialLimitedSlipRatio = 1.3;
       const antiRollbar = true;
 
-      const maxEngineTorque = 2000.0;
+      const maxEngineTorque = 2500.0;
       const clutchStrength = 100.0;
       const minRPM = 400;
       const maxRPM = 10000;
@@ -662,21 +665,6 @@ class Game {
       let wheelMaterial = new THREE.MeshPhongMaterial({ color: 0x666666 });
       wheelMaterial.map = texture;
 
-      const createThreeWheel = (constraint, wheelIndex, body) => {
-         const joltWheel = constraint.GetWheel(wheelIndex);
-         const wheelSetting = joltWheel.GetSettings();
-         const wheel = new THREE.Mesh(new THREE.CylinderGeometry(wheelSetting.mRadius, wheelSetting.mRadius, wheelSetting.mWidth, 20, 1), wheelMaterial);
-         body.add(wheel);
-
-         wheel.updateLocalTransform = () => {
-            let transform = constraint.GetWheelLocalTransform(wheelIndex, wheelRight, wheelUp);
-            wheel.position.copy(this.wrapVec3(transform.GetTranslation()));
-            wheel.quaternion.copy(this.wrapQuat(transform.GetRotation().GetQuaternion()));
-         };
-         wheel.updateLocalTransform();
-
-         return wheel;
-      }
 
       this.tempRVec.Set(10, 0, -30);
       this.tempQuat.Set(0, 180, 0, 1);
@@ -687,212 +675,266 @@ class Game {
 
 
          let carBody = null;
-         this.gltfLoader.load(
-            "static/gameAssets/s15_body.glb",
-            (gltf) => {
-               console.log("GLTF model loaded successfully");
+         Promise.all([
+            new Promise((resolve, reject) => {
+               this.gltfLoader.load("static/gameAssets/s15_body.glb", resolve, undefined, reject);
+            }),
+            new Promise((resolve, reject) => {
+               this.gltfLoader.load("static/gameAssets/s15_wheel_l.glb", resolve, undefined, reject);
+            }),
+            new Promise((resolve, reject) => {
+               this.gltfLoader.load("static/gameAssets/s15_wheel_r.glb", resolve, undefined, reject);
+            })
+         ]).then(([carGltf, wheelGltfL, wheelGltfR]) => {
+            console.log("Car and wheel models loaded successfully");
 
-               let coronaSafetyDistance = 0.3;
+            const carModel = carGltf.scene.clone();
 
-               const carModel = gltf.scene;
-               let goal = new THREE.Object3D();
-               let follow = new THREE.Object3D();
-               follow.position.z = -coronaSafetyDistance;
-               carModel.position.y = -200;
-               carModel.frustumCulled = false;
-               carModel.add(follow);
-               goal.add(this.camera);
-
-               //carModel.scale.set(0.018, 0.018, 0.018);
-
-               carModel.position.set(-100, 0, 0);
-
-               carBody = this.createAndAddBody(
-                  carShapeSettings,
-                  this.tempRVec,
-                  this.tempQuat,
-                  this.Jolt.EMotionType_Dynamic,
-                  LAYER_MOVING,
-                  0xff0000,
-                  vehicleMass,
-                  null,
-                  carModel
-               );
-
-               const vehicleMesh = this.dynamicObjects[this.dynamicObjects.length - 1];
-               const vehicle = new this.Jolt.VehicleConstraintSettings();
-               vehicle.mMaxPitchRollAngle = this.degreesToRadians(60);
-               vehicle.mWheels.clear();
-               const mWheels = [];
-               {
-                  const frontLongitudinalCurve = new this.Jolt.LinearCurve();
-                  frontLongitudinalCurve.AddPoint(0.05 * frontTyreLongitudalFriction, 1.2 * frontTyreLongitudalFriction);
-                  frontLongitudinalCurve.Sort();
+            this.wheelGltfL = wheelGltfL;
+            this.wheelGltfR = wheelGltfR;
 
 
-                  const frontLateralCurve = new this.Jolt.LinearCurve();
-                  frontLateralCurve.AddPoint(0.1 * frontTyreLateralFriction, 1.15 * frontTyreLateralFriction);
-                  frontLateralCurve.Sort();
+            let safetyDistance = 0.3;
+            let goal = new THREE.Object3D();
+            let follow = new THREE.Object3D();
+            follow.position.z = -safetyDistance;
+            carModel.position.y = -200;
+            carModel.frustumCulled = false;
+            carModel.add(follow);
+            goal.add(this.camera);
 
-                  const rearLongitudinalCurve = new this.Jolt.LinearCurve();
-                  rearLongitudinalCurve.AddPoint(0.05 * rearTyreLongitudalFriction, 1.1 * rearTyreLongitudalFriction);
-                  rearLongitudinalCurve.Sort();
+            //carModel.scale.set(0.018, 0.018, 0.018);
 
-                  const rearLateralCurve = new this.Jolt.LinearCurve();
-                  rearLateralCurve.AddPoint(0.1 * rearTyreLateralFriction, 1.1 * rearTyreLateralFriction);
-                  rearLateralCurve.Sort();
+            carModel.position.set(-100, 0, 0);
 
-                  const fl = new this.Jolt.WheelSettingsWV();
-                  fl.mPosition = new this.Jolt.Vec3((halfVehicleWidth + wheelOffset), -wheelOffsetVertical, wheelBase);
-                  fl.set_mMaxSteerAngle(maxSteerAngle);
-                  fl.mMaxHandBrakeTorque = 0.0;
-                  fl.set_mLateralFriction(frontLateralCurve);
-                  fl.set_mLongitudinalFriction(frontLongitudinalCurve);
-                  vehicle.mWheels.push_back(fl);
-                  mWheels.push(fl);
+            carBody = this.createAndAddBody(
+               carShapeSettings,
+               this.tempRVec,
+               this.tempQuat,
+               this.Jolt.EMotionType_Dynamic,
+               LAYER_MOVING,
+               0xff0000,
+               vehicleMass,
+               null,
+               carModel
+            );
 
-                  const fr = new this.Jolt.WheelSettingsWV();
-                  fr.mPosition = new this.Jolt.Vec3(-(halfVehicleWidth + wheelOffset), -wheelOffsetVertical, wheelBase);
-                  fr.set_mMaxSteerAngle(maxSteerAngle);
-                  fr.mMaxHandBrakeTorque = 0.0;
-                  fr.set_mLateralFriction(frontLateralCurve);
-                  fr.set_mLongitudinalFriction(frontLongitudinalCurve);
-                  vehicle.mWheels.push_back(fr);
-                  mWheels.push(fr);
-
-                  const bl = new this.Jolt.WheelSettingsWV();
-                  bl.mPosition = new this.Jolt.Vec3((halfVehicleWidth + wheelOffset), -wheelOffsetVertical, -wheelBase);
-                  bl.set_mMaxSteerAngle(0);
-                  bl.set_mLateralFriction(rearLateralCurve);
-                  bl.set_mLongitudinalFriction(rearLongitudinalCurve);
-                  vehicle.mWheels.push_back(bl);
-                  mWheels.push(bl);
-
-                  const br = new this.Jolt.WheelSettingsWV();
-                  br.mPosition = new this.Jolt.Vec3(-(halfVehicleWidth + wheelOffset), -wheelOffsetVertical, -wheelBase);
-                  br.set_mMaxSteerAngle(0);
-                  br.set_mLateralFriction(rearLateralCurve);
-                  br.set_mLongitudinalFriction(rearLongitudinalCurve);
-                  vehicle.mWheels.push_back(br);
-                  mWheels.push(br);
-
-                  this.Jolt.destroy(frontLateralCurve);
-                  this.Jolt.destroy(frontLongitudinalCurve);
-                  this.Jolt.destroy(rearLateralCurve);
-                  this.Jolt.destroy(rearLongitudinalCurve);
-               }
-               mWheels.forEach(wheelS => {
-                  wheelS.mRadius = wheelRadius;
-                  wheelS.mWidth = wheelWidth;
-                  wheelS.mSuspensionMinLength = suspensionMinLength;
-                  wheelS.mSuspensionMaxLength = suspensionMaxLength;
-                  // wheelS.set_mSuspensionPreloadLength(suspensionPreloadLenght);
-
-                  // const spring = wheelS.get_mSuspensionSpring()
-                  // spring.set_mStiffness(suspensionStiffness);
-                  // spring.set_mFrequency(suspensionFrequency);
-                  // spring.set_mDamping(suspensionDamping);
-               });
-
-               const controllerSettings = new this.Jolt.WheeledVehicleControllerSettings();
-
-               // Powertrain
-               const engine = controllerSettings.get_mEngine();
-               engine.set_mMinRPM(minRPM);
-               engine.set_mMaxRPM(maxRPM);
-               engine.set_mAngularDamping(damperMass);
-               engine.set_mInertia(flywheelMass);
-               engine.set_mMaxTorque(maxEngineTorque);
-
-               const transmission = controllerSettings.get_mTransmission();
-               transmission.set_mClutchStrength(clutchStrength);
-               transmission.set_mMode(transmissionMode);
-
-               vehicle.mController = controllerSettings;
-
-               // Rear differential
-               controllerSettings.mDifferentials.clear();
-               const rearWheelDrive = new this.Jolt.VehicleDifferentialSettings();
-               rearWheelDrive.mLeftWheel = BL_WHEEL;
-               rearWheelDrive.mRightWheel = BR_WHEEL;
-               rearWheelDrive.mLimitedSlipRatio = differentialLimitedSlipRatio;
-               controllerSettings.mDifferentials.push_back(rearWheelDrive);
-               rearWheelDrive.mEngineTorqueRatio = 1;
-
-               // 4WD settings
-               if (fourWheelDrive) {
-                  // adjust rear
-                  rearWheelDrive.mEngineTorqueRatio = 0.5;
-                  controllerSettings.mDifferentialLimitedSlipRatio = torqueSplitRatio;
-
-                  // add front
-                  const frontWheelDrive = new this.Jolt.VehicleDifferentialSettings();
-                  frontWheelDrive.mLeftWheel = FL_WHEEL;
-                  frontWheelDrive.mRightWheel = FR_WHEEL;
-                  frontWheelDrive.mLimitedSlipRatio = differentialLimitedSlipRatio;
-                  frontWheelDrive.mEngineTorqueRatio = 0.5;
-                  controllerSettings.mDifferentials.push_back(frontWheelDrive);
-               }
-
-               // Antirollbar
-               if (antiRollbar) {
-                  vehicle.mAntiRollBars.clear();
-                  const frontRollBar = new this.Jolt.VehicleAntiRollBar();
-                  frontRollBar.mLeftWheel = FL_WHEEL;
-                  frontRollBar.mRightWheel = FR_WHEEL;
-                  const rearRollBar = new this.Jolt.VehicleAntiRollBar();
-                  rearRollBar.mLeftWheel = BL_WHEEL;
-                  rearRollBar.mRightWheel = BR_WHEEL;
-                  vehicle.mAntiRollBars.push_back(frontRollBar);
-                  vehicle.mAntiRollBars.push_back(rearRollBar);
-               }
-
-               this.vehicle = new this.Jolt.VehicleConstraint(carBody, vehicle);
-               const tester = new this.Jolt.VehicleCollisionTesterCastCylinder(LAYER_MOVING, 0.05);
-               this.vehicle.SetVehicleCollisionTester(tester);
-
-               this.vehicleBody = carBody;
-               this.vehicleMesh = carModel;
-
-               const callbacks = new this.Jolt.VehicleConstraintCallbacksJS();
-               callbacks.GetCombinedFriction = (wheelIndex, tireFrictionDirection, tireFriction, body2, subShapeID2) => {
-                  const otherBody = this.Jolt.wrapPointer(body2, this.Jolt.Body);
-                  return Math.sqrt(tireFriction * otherBody.GetFriction());
-               };
-               callbacks.OnPreStepCallback = (vehicle, stepContext) => { };
-               callbacks.OnPostCollideCallback = (vehicle, stepContext) => { };
-               callbacks.OnPostStepCallback = (vehicle, stepContext) => { };
-               callbacks.SetVehicleConstraint(this.vehicle);
-               this.vehicleCallbacks = callbacks;
-
-               this.physicsSystem.AddConstraint(this.vehicle);
-               this.playerController = this.Jolt.castObject(this.vehicle.GetController(), this.Jolt.WheeledVehicleController);
-               this.vehicleEngine = this.playerController.GetEngine();
-               this.vehicleTransmission = this.playerController.GetTransmission();
-
-               const controllerCallbacks = new this.Jolt.WheeledVehicleControllerCallbacksJS();
-               controllerCallbacks.OnTireMaxImpulseCallback = (wheelIndex, result, suspensionImpulse,
-                  longitudinalFriction, lateralFriction, longitudinalSlip, lateralSlip, deltaTime) => {
-                  const resultObj = this.Jolt.wrapPointer(result, this.Jolt.TireMaxImpulseCallbackResult);
-                  resultObj.mLongitudinalImpulse = longitudinalFriction * suspensionImpulse;
-                  resultObj.mLateralImpulse = lateralFriction * suspensionImpulse;
-               };
-               controllerCallbacks.SetWheeledVehicleController(this.playerController);
-               this.controllerCallbacks = controllerCallbacks;
-
-               this.vehicleWheels = [];
-               for (let i = 0; i < vehicle.mWheels.size(); i++) {
-                  this.vehicleWheels.push(createThreeWheel(this.vehicle, i, vehicleMesh));
-               }
-
-               const stepListener = new this.Jolt.VehicleConstraintStepListener(this.vehicle);
-               this.vehicleStepListener = this.physicsSystem.AddStepListener(stepListener);
+            const vehicleMesh = this.dynamicObjects[this.dynamicObjects.length - 1];
+            const vehicle = new this.Jolt.VehicleConstraintSettings();
+            vehicle.mMaxPitchRollAngle = this.degreesToRadians(60);
+            vehicle.mWheels.clear();
+            const mWheels = [];
+            {
+               const frontLongitudinalCurve = new this.Jolt.LinearCurve();
+               frontLongitudinalCurve.AddPoint(0.05 * frontTyreLongitudalFriction, 1.2 * frontTyreLongitudalFriction);
+               frontLongitudinalCurve.Sort();
 
 
-               console.log("Created vehicle with step listener");
-               return carBody;
+               const frontLateralCurve = new this.Jolt.LinearCurve();
+               frontLateralCurve.AddPoint(0.1 * frontTyreLateralFriction, 1.15 * frontTyreLateralFriction);
+               frontLateralCurve.Sort();
 
+               const rearLongitudinalCurve = new this.Jolt.LinearCurve();
+               rearLongitudinalCurve.AddPoint(0.05 * rearTyreLongitudalFriction, 1.1 * rearTyreLongitudalFriction);
+               rearLongitudinalCurve.Sort();
+
+               const rearLateralCurve = new this.Jolt.LinearCurve();
+               rearLateralCurve.AddPoint(0.1 * rearTyreLateralFriction, 1.1 * rearTyreLateralFriction);
+               rearLateralCurve.Sort();
+
+               const fl = new this.Jolt.WheelSettingsWV();
+               fl.mPosition = new this.Jolt.Vec3((halfVehicleWidth + wheelOffset), -wheelOffsetVertical, wheelBase + wheelOffsetLongitudal);
+               fl.set_mMaxSteerAngle(maxSteerAngle);
+               fl.mMaxHandBrakeTorque = 0.0;
+               fl.set_mLateralFriction(frontLateralCurve);
+               fl.set_mLongitudinalFriction(frontLongitudinalCurve);
+               vehicle.mWheels.push_back(fl);
+               mWheels.push(fl);
+
+               const fr = new this.Jolt.WheelSettingsWV();
+               fr.mPosition = new this.Jolt.Vec3(-(halfVehicleWidth + wheelOffset), -wheelOffsetVertical, wheelBase + wheelOffsetLongitudal);
+               fr.set_mMaxSteerAngle(maxSteerAngle);
+               fr.mMaxHandBrakeTorque = 0.0;
+               fr.set_mLateralFriction(frontLateralCurve);
+               fr.set_mLongitudinalFriction(frontLongitudinalCurve);
+               vehicle.mWheels.push_back(fr);
+               mWheels.push(fr);
+
+               const bl = new this.Jolt.WheelSettingsWV();
+               bl.mPosition = new this.Jolt.Vec3((halfVehicleWidth + wheelOffset), -wheelOffsetVertical, -wheelBase + wheelOffsetLongitudal / 2);
+               bl.set_mMaxSteerAngle(0);
+               fr.mMaxHandBrakeTorque = 100.0;
+               bl.set_mLateralFriction(rearLateralCurve);
+               bl.set_mLongitudinalFriction(rearLongitudinalCurve);
+               vehicle.mWheels.push_back(bl);
+               mWheels.push(bl);
+
+               const br = new this.Jolt.WheelSettingsWV();
+               br.mPosition = new this.Jolt.Vec3(-(halfVehicleWidth + wheelOffset), -wheelOffsetVertical, -wheelBase + wheelOffsetLongitudal / 2);
+               br.set_mMaxSteerAngle(0);
+               fr.mMaxHandBrakeTorque = 100.0;
+               br.set_mLateralFriction(rearLateralCurve);
+               br.set_mLongitudinalFriction(rearLongitudinalCurve);
+               vehicle.mWheels.push_back(br);
+               mWheels.push(br);
+
+               this.Jolt.destroy(frontLateralCurve);
+               this.Jolt.destroy(frontLongitudinalCurve);
+               this.Jolt.destroy(rearLateralCurve);
+               this.Jolt.destroy(rearLongitudinalCurve);
+            }
+            mWheels.forEach(wheelS => {
+               wheelS.mRadius = wheelRadius;
+               wheelS.mWidth = wheelWidth;
+               wheelS.mSuspensionMinLength = suspensionMinLength;
+               wheelS.mSuspensionMaxLength = suspensionMaxLength;
+               wheelS.set_mSuspensionPreloadLength(suspensionPreloadLenght);
+
+               const spring = wheelS.get_mSuspensionSpring()
+               spring.set_mStiffness(suspensionStiffness);
+               spring.set_mFrequency(suspensionFrequency);
+               spring.set_mDamping(suspensionDamping);
             });
+
+            const controllerSettings = new this.Jolt.WheeledVehicleControllerSettings();
+
+            // Powertrain
+            const engine = controllerSettings.get_mEngine();
+            engine.set_mMinRPM(minRPM);
+            engine.set_mMaxRPM(maxRPM);
+            engine.set_mAngularDamping(damperMass);
+            engine.set_mInertia(flywheelMass);
+            engine.set_mMaxTorque(maxEngineTorque);
+
+            const transmission = controllerSettings.get_mTransmission();
+            transmission.set_mClutchStrength(clutchStrength);
+            transmission.set_mMode(transmissionMode);
+
+            vehicle.mController = controllerSettings;
+
+            // Rear differential
+            controllerSettings.mDifferentials.clear();
+            const rearWheelDrive = new this.Jolt.VehicleDifferentialSettings();
+            rearWheelDrive.mLeftWheel = BL_WHEEL;
+            rearWheelDrive.mRightWheel = BR_WHEEL;
+            rearWheelDrive.mLimitedSlipRatio = differentialLimitedSlipRatio;
+            controllerSettings.mDifferentials.push_back(rearWheelDrive);
+            rearWheelDrive.mEngineTorqueRatio = 1;
+
+            // 4WD settings
+            if (fourWheelDrive) {
+               // adjust rear
+               rearWheelDrive.mEngineTorqueRatio = 0.5;
+               controllerSettings.mDifferentialLimitedSlipRatio = torqueSplitRatio;
+
+               // add front
+               const frontWheelDrive = new this.Jolt.VehicleDifferentialSettings();
+               frontWheelDrive.mLeftWheel = FL_WHEEL;
+               frontWheelDrive.mRightWheel = FR_WHEEL;
+               frontWheelDrive.mLimitedSlipRatio = differentialLimitedSlipRatio;
+               frontWheelDrive.mEngineTorqueRatio = 0.5;
+               controllerSettings.mDifferentials.push_back(frontWheelDrive);
+            }
+
+            // Antirollbar
+            if (antiRollbar) {
+               vehicle.mAntiRollBars.clear();
+               const frontRollBar = new this.Jolt.VehicleAntiRollBar();
+               frontRollBar.mLeftWheel = FL_WHEEL;
+               frontRollBar.mRightWheel = FR_WHEEL;
+               const rearRollBar = new this.Jolt.VehicleAntiRollBar();
+               rearRollBar.mLeftWheel = BL_WHEEL;
+               rearRollBar.mRightWheel = BR_WHEEL;
+               vehicle.mAntiRollBars.push_back(frontRollBar);
+               vehicle.mAntiRollBars.push_back(rearRollBar);
+            }
+
+            this.vehicle = new this.Jolt.VehicleConstraint(carBody, vehicle);
+            const tester = new this.Jolt.VehicleCollisionTesterCastCylinder(LAYER_MOVING, 0.05);
+            this.vehicle.SetVehicleCollisionTester(tester);
+
+            this.vehicleBody = carBody;
+            this.vehicleMesh = carModel;
+
+            const callbacks = new this.Jolt.VehicleConstraintCallbacksJS();
+            callbacks.GetCombinedFriction = (wheelIndex, tireFrictionDirection, tireFriction, body2, subShapeID2) => {
+               const otherBody = this.Jolt.wrapPointer(body2, this.Jolt.Body);
+               return Math.sqrt(tireFriction * otherBody.GetFriction());
+            };
+            callbacks.OnPreStepCallback = (vehicle, stepContext) => { };
+            callbacks.OnPostCollideCallback = (vehicle, stepContext) => { };
+            callbacks.OnPostStepCallback = (vehicle, stepContext) => { };
+            callbacks.SetVehicleConstraint(this.vehicle);
+            this.vehicleCallbacks = callbacks;
+
+            this.physicsSystem.AddConstraint(this.vehicle);
+            this.playerController = this.Jolt.castObject(this.vehicle.GetController(), this.Jolt.WheeledVehicleController);
+            this.vehicleEngine = this.playerController.GetEngine();
+            this.vehicleTransmission = this.playerController.GetTransmission();
+
+            const controllerCallbacks = new this.Jolt.WheeledVehicleControllerCallbacksJS();
+            controllerCallbacks.OnTireMaxImpulseCallback = (wheelIndex, result, suspensionImpulse,
+               longitudinalFriction, lateralFriction, longitudinalSlip, lateralSlip, deltaTime) => {
+               const resultObj = this.Jolt.wrapPointer(result, this.Jolt.TireMaxImpulseCallbackResult);
+               resultObj.mLongitudinalImpulse = longitudinalFriction * suspensionImpulse;
+               resultObj.mLateralImpulse = lateralFriction * suspensionImpulse;
+            };
+            controllerCallbacks.SetWheeledVehicleController(this.playerController);
+            this.controllerCallbacks = controllerCallbacks;
+
+            const createThreeWheel = (constraint, wheelIndex, body) => {
+               const joltWheel = constraint.GetWheel(wheelIndex);
+               const wheelSetting = joltWheel.GetSettings();
+
+               const scaleRatio = wheelSetting.mRadius / 0.5;
+               const isLeftSide = wheelIndex === 0 || wheelIndex === 2;
+
+               let wheel;
+               if (isLeftSide) {
+                  wheel = this.wheelGltfL.scene.clone();
+                  wheel.rotation.x = -Math.PI / 2;
+               } else {
+                  wheel = this.wheelGltfR.scene.clone();
+                  wheel.rotation.x = Math.PI / 2;
+               }
+               const additionalScaleFactor = 0.7;
+               wheel.scale.set(
+                  scaleRatio * additionalScaleFactor,
+                  scaleRatio * additionalScaleFactor,
+                  scaleRatio * additionalScaleFactor
+               );
+               wheel.scale.set(scaleRatio, scaleRatio, scaleRatio);
+               body.add(wheel);
+
+               wheel.updateLocalTransform = () => {
+                  let transform = constraint.GetWheelLocalTransform(wheelIndex, wheelRight, wheelUp);
+                  wheel.position.copy(this.wrapVec3(transform.GetTranslation()));
+                  const wheelRotation = this.wrapQuat(transform.GetRotation().GetQuaternion());
+                  wheel.quaternion.copy(wheelRotation);
+                  if (isLeftSide) {
+                     wheel.rotateX(-Math.PI / 2);
+                  } else {
+                     wheel.rotateX(Math.PI / 2);
+                  }
+               };
+
+               wheel.updateLocalTransform();
+               return wheel;
+            };
+
+            this.vehicleWheels = [];
+            for (let i = 0; i < vehicle.mWheels.size(); i++) {
+               this.vehicleWheels.push(createThreeWheel(this.vehicle, i, vehicleMesh));
+            }
+
+            const stepListener = new this.Jolt.VehicleConstraintStepListener(this.vehicle);
+            this.vehicleStepListener = this.physicsSystem.AddStepListener(stepListener);
+
+
+            console.log("Created vehicle with step listener");
+            return carBody;
+
+         });
 
 
       } catch (error) {
