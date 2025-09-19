@@ -24,7 +24,7 @@ type application struct {
 }
 
 func main() {
-	addr := flag.String("addr", ":4000", "HTTP network address")
+	addr := flag.String("addr", "0.0.0.0:4000", "HTTP network address")
 
 	infoLog := log.New(os.Stdout, "\033[42;30mINFO\033[0m\t", log.Ldate|log.Ltime)
 	errorLog := log.New(os.Stderr, "\033[41;30mERROR\033[0m\t", log.Ldate|log.Ltime|log.Lshortfile)
@@ -63,7 +63,7 @@ func main() {
 		WriteTimeout: 10 * time.Second,
 	}
 
-	infoLog.Printf("Starting server on http://localhost%s", *addr)
+	infoLog.Printf("Starting server on http://%s", *addr)
 	err = srv.ListenAndServe()
 	errorLog.Fatal(err)
 }
