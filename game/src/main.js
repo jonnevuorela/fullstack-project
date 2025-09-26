@@ -355,9 +355,9 @@ class Game {
          this.scene = new THREE.Scene();
          this.scene.background = new THREE.Color(0xffd577);
 
-         this.scene.add(new THREE.AmbientLight(0x1f2a4d));
-         const dirLight = new THREE.DirectionalLight(0xffcc77, 2);
-         dirLight.position.set(10, 7, 5);
+         this.scene.add(new THREE.AmbientLight(0x303b5e));
+         const dirLight = new THREE.DirectionalLight(0xffcc77, 3);
+         dirLight.position.set(10, 5, 5);
          this.scene.add(dirLight);
 
          this.camera = new THREE.PerspectiveCamera(90, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -365,8 +365,10 @@ class Game {
          this.camera.lookAt(new THREE.Vector3(0, 0, 0));
 
          this.renderer = new THREE.WebGLRenderer({ antialias: true });
+         const width = window.innerWidth * 0.9;
+         const height = window.innerHeight * 0.9;
          this.renderer.setClearColor(0xbfd1e5);
-         this.renderer.setSize(window.innerWidth, window.innerHeight);
+         this.renderer.setSize(width, height);
          this.renderer.setPixelRatio(window.devicePixelRatio);
 
          if (!this.canvasContainer) throw new Error("gameCanvas element not found");
@@ -377,7 +379,7 @@ class Game {
 
          this.uiOverlay = document.createElement('div');
          this.uiOverlay.id = 'ui-display';
-         this.uiOverlay.className = 'game-overlay ui-display';
+         this.uiOverlay.className = 'game-overlay';
          this.uiOverlay.innerHTML = '<span id="rpm-value">0 RPM</span>';
          this.canvasContainer.appendChild(this.uiOverlay);
 
@@ -599,6 +601,7 @@ class Game {
          this.setState(State.ERROR, error.message);
          throw error;
       }
+
    }
 
    createVehicle() {
@@ -657,13 +660,6 @@ class Game {
       const wheelRight = new this.Jolt.Vec3(0, 1, 0);
       const wheelUp = new this.Jolt.Vec3(1, 0, 0);
 
-      const texture = this.texLoader.load('data:image/gif;base64,R0lGODdhAgACAIABAAAAAP///ywAAAAAAgACAAACA0QCBQA7');
-      texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
-      texture.offset.set(0, 0);
-      texture.repeat.set(1, 1);
-      texture.magFilter = THREE.NearestFilter;
-      let wheelMaterial = new THREE.MeshPhongMaterial({ color: 0x666666 });
-      wheelMaterial.map = texture;
 
 
       this.tempRVec.Set(10, 0, -30);
