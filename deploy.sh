@@ -6,6 +6,10 @@ exec > >(tee -a "$LOGFILE") 2>&1
 
 echo "===== Deployment started at $(date) ====="
 
+cd /home/jonne/fullstack-project
+
+git pull --rebase
+
 cd /home/jonne/fullstack-project/game
 
 echo "[$(date)] Running npm install..."
