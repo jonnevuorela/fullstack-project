@@ -7,7 +7,6 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 
 import initJolt from 'jolt-physics';
-import { materialReference } from 'three/src/nodes/TSL.js';
 
 const LAYER_NON_MOVING = 0;
 const LAYER_MOVING = 1;
@@ -70,185 +69,6 @@ class Game {
       this.vehicleTransmission = null;
 
       this.groundMesh = null;
-      this.track = [
-         // track
-         [
-            [
-               [38, 64, -14],
-               [38, 64, -16],
-               [38, -64, -16],
-               [38, -64, -14],
-               [64, -64, -16],
-               [64, -64, -14],
-               [64, 64, -16],
-               [64, 64, -14],
-            ],
-            [
-               [-16, 64, -14],
-               [-16, 64, -16],
-               [-16, -64, -16],
-               [-16, -64, -14],
-               [10, -64, -16],
-               [10, -64, -14],
-               [10, 64, -16],
-               [10, 64, -14],
-            ],
-            [
-               [10, -48, -14],
-               [10, -48, -16],
-               [10, -64, -16],
-               [10, -64, -14],
-               [38, -64, -16],
-               [38, -64, -14],
-               [38, -48, -16],
-               [38, -48, -14],
-            ],
-            [
-               [10, 64, -14],
-               [10, 64, -16],
-               [10, 48, -16],
-               [10, 48, -14],
-               [38, 48, -16],
-               [38, 48, -14],
-               [38, 64, -16],
-               [38, 64, -14],
-            ],
-         ],
-         // walls
-         [
-            [
-               [38, 48, -10],
-               [38, 48, -14],
-               [38, -48, -14],
-               [38, -48, -10],
-               [40, -48, -14],
-               [40, -48, -10],
-               [40, 48, -14],
-               [40, 48, -10],
-            ],
-            [
-               [62, 62, -10],
-               [62, 62, -14],
-               [62, -64, -14],
-               [62, -64, -10],
-               [64, -64, -14],
-               [64, -64, -10],
-               [64, 62, -14],
-               [64, 62, -10],
-            ],
-            [
-               [8, 48, -10],
-               [8, 48, -14],
-               [8, -48, -14],
-               [8, -48, -10],
-               [10, -48, -14],
-               [10, -48, -10],
-               [10, 48, -14],
-               [10, 48, -10],
-            ],
-            [
-               [-16, 62, -10],
-               [-16, 62, -14],
-               [-16, -64, -14],
-               [-16, -64, -10],
-               [-14, -64, -14],
-               [-14, -64, -10],
-               [-14, 62, -14],
-               [-14, 62, -10],
-            ],
-            [
-               [-14, -62, -10],
-               [-14, -62, -14],
-               [-14, -64, -14],
-               [-14, -64, -10],
-               [62, -64, -14],
-               [62, -64, -10],
-               [62, -62, -14],
-               [62, -62, -10],
-            ],
-            [
-               [8, -48, -10],
-               [8, -48, -14],
-               [8, -50, -14],
-               [8, -50, -10],
-               [40, -50, -14],
-               [40, -50, -10],
-               [40, -48, -14],
-               [40, -48, -10],
-            ],
-            [
-               [8, 50, -10],
-               [8, 50, -14],
-               [8, 48, -14],
-               [8, 48, -10],
-               [40, 48, -14],
-               [40, 48, -10],
-               [40, 50, -14],
-               [40, 50, -10],
-            ],
-            //            [
-            //               [-16, 64, -10],
-            //               [-16, 64, -14],
-            //               [-16, 62, -14],
-            //               [-16, 62, -10],
-            //               [64, 62, -14],
-            //               [64, 62, -10],
-            //               [64, 64, -14],
-            //               [64, 64, -10],
-            //            ],
-         ],
-         // jumps
-         [
-            [
-               [-4, 22, -14],
-               [-4, -14, -14],
-               [-4, -14, -10],
-               [4, -14, -14],
-               [4, -14, -10],
-               [4, 22, -14],
-            ],
-            [
-               [-4, -27, -14],
-               [-4, -48, -14],
-               [-4, -48, -11],
-               [4, -48, -14],
-               [4, -48, -11],
-               [4, -27, -14],
-            ],
-            [
-               [-4, 50, -14],
-               [-4, 30, -14],
-               [-4, 30, -12],
-               [4, 30, -14],
-               [4, 30, -12],
-               [4, 50, -14],
-            ],
-            [
-               [46, 50, -14],
-               [46, 31, -14],
-               [46, 50, -12],
-               [54, 31, -14],
-               [54, 50, -12],
-               [54, 50, -14],
-            ],
-            [
-               [46, 16, -14],
-               [46, -19, -14],
-               [46, 16, -10],
-               [54, -19, -14],
-               [54, 16, -10],
-               [54, 16, -14],
-            ],
-            [
-               [46, -28, -14],
-               [46, -48, -14],
-               [46, -28, -11],
-               [54, -48, -14],
-               [54, -28, -11],
-               [54, -28, -14],
-            ],
-         ],
-      ];
       this.mapColors = [0x666666, 0x006600, 0x000066];
    }
 
@@ -543,7 +363,7 @@ class Game {
          this.tempQuat.Set(0, 0, 0, 1);
 
          const groundShapeSettings = new this.Jolt.BoxShapeSettings(
-            new this.Jolt.Vec3(20000, 0.5, 20000),
+            new this.Jolt.Vec3(20000, 0.1, 20000),
             0.05
          );
 
@@ -566,42 +386,146 @@ class Game {
       }
    }
 
+
+   createTriangleListFromThreeObject(threeObject) {
+      let vertices = [];
+      let indices = [];
+      let vertexOffset = 0;
+
+      threeObject.updateMatrixWorld(true);
+
+      threeObject.traverse((child) => {
+         if (child.isMesh && child.geometry) {
+            const geometry = child.geometry;
+            geometry.computeVertexNormals();
+
+            const positionAttribute = geometry.getAttribute('position');
+            const indexAttribute = geometry.getIndex();
+
+            if (!positionAttribute) {
+               console.warn(`Mesh ${child.name} missing position attribute`);
+               return;
+            }
+
+            const worldMatrix = child.matrixWorld;
+            const vertex = new THREE.Vector3();
+
+            for (let i = 0; i < positionAttribute.count; i++) {
+               vertex.fromBufferAttribute(positionAttribute, i);
+               vertex.applyMatrix4(worldMatrix);
+
+               vertices.push(vertex.x);
+               vertices.push(vertex.y);
+               vertices.push(vertex.z);
+            }
+
+            if (indexAttribute) {
+               for (let i = 0; i < indexAttribute.count; i++) {
+                  indices.push(indexAttribute.getX(i) + vertexOffset);
+               }
+            } else {
+               for (let i = 0; i < positionAttribute.count / 3; i++) {
+                  indices.push(vertexOffset + i * 3);
+                  indices.push(vertexOffset + i * 3 + 1);
+                  indices.push(vertexOffset + i * 3 + 2);
+               }
+            }
+
+            vertexOffset += positionAttribute.count;
+         }
+      });
+
+      if (vertices.length === 0) {
+         console.error("No valid geometry found in Three.js object");
+         return null;
+      }
+
+      const triangleList = new this.Jolt.TriangleList();
+      const vertexCount = vertices.length / 3;
+
+      for (let i = 0; i < indices.length; i += 3) {
+         const idx1 = indices[i];
+         const idx2 = indices[i + 1];
+         const idx3 = indices[i + 2];
+
+         if (idx1 < vertexCount && idx2 < vertexCount && idx3 < vertexCount) {
+            const v1 = new this.Jolt.Vec3(vertices[idx1 * 3], vertices[idx1 * 3 + 1], vertices[idx1 * 3 + 2]);
+            const v2 = new this.Jolt.Vec3(vertices[idx2 * 3], vertices[idx2 * 3 + 1], vertices[idx2 * 3 + 2]);
+            const v3 = new this.Jolt.Vec3(vertices[idx3 * 3], vertices[idx3 * 3 + 1], vertices[idx3 * 3 + 2]);
+
+            triangleList.push_back(new this.Jolt.Triangle(v1, v2, v3));
+
+            this.Jolt.destroy(v1);
+            this.Jolt.destroy(v2);
+            this.Jolt.destroy(v3);
+         }
+      }
+
+      return triangleList;
+   }
+
+
    createTrack() {
       this.setState(State.LOADING);
       console.log("Creating track");
-
       try {
-         this.track.forEach((type, tIdx) => {
-            type.forEach((block) => {
-               const hull = new this.Jolt.ConvexHullShapeSettings();
-               block.forEach((v) => {
-                  this.tempVec.Set(-v[1], v[2], v[0]);
-                  hull.mPoints.push_back(this.tempVec);
-               });
+         Promise.all([
+            new Promise((resolve, reject) => {
+               this.gltfLoader.load(
+                  "static/gameAssets/road.glb",
+                  resolve,
+                  (progress) => console.log(`Loading road.glb: ${progress.loaded}/${progress.total} bytes`),
+                  (error) => {
+                     console.error("Failed to load road.glb:", error);
+                     reject(error);
+                  }
+               );
+            }),
+         ])
+            .then(([roadGltf]) => {
+               console.log("Road model loaded successfully");
+               const roadModel = roadGltf.scene.clone();
 
-               this.tempRVec.Set(0, 0, 0);
+               roadModel.position.set(0, -16, 0);
+               roadModel.quaternion.set(0, 0, 0, 1);
+
+               const triangleList = this.createTriangleListFromThreeObject(roadModel);
+               if (!triangleList) {
+                  console.error("Failed to create TriangleList from road model");
+                  this.setState(State.ERROR, "Failed to create physics shape for road");
+                  return;
+               }
+
+               const roadShapeSettings = new this.Jolt.MeshShapeSettings(triangleList);
+
+               this.tempRVec.Set(0, -16, 0);
                this.tempQuat.Set(0, 0, 0, 1);
 
                this.createAndAddBody(
-                  hull,
+                  roadShapeSettings,
                   this.tempRVec,
                   this.tempQuat,
                   this.Jolt.EMotionType_Static,
                   LAYER_NON_MOVING,
-                  this.mapColors[tIdx]
+                  0x666666,
+                  0,
+                  null,
+                  roadModel
                );
 
-               this.Jolt.destroy(hull);
+               this.Jolt.destroy(triangleList);
+               this.Jolt.destroy(roadShapeSettings);
+               console.log("Road model added to scene and physics system with mesh shape");
+            })
+            .catch((error) => {
+               console.error("Failed to load road model:", error);
+               this.setState(State.ERROR, `Failed to load road model: ${error.message}`);
             });
-         });
-
-         console.log("Track created successfully");
       } catch (error) {
          console.error("Failed to create track:", error);
-         this.setState(State.ERROR, error.message);
+         this.setState(State.ERROR, `Track creation error: ${error.message}`);
          throw error;
       }
-
    }
 
    createVehicle() {
