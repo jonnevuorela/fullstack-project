@@ -386,7 +386,8 @@ class Game {
       }
    }
 
-
+   // AI generoitu: Create a function that gets vectors out of THREE.js object
+   // and returns a triangle list for Jolt MeshShapeSettings. - Grok 4 Fast
    createTriangleListFromThreeObject(threeObject) {
       let vertices = [];
       let indices = [];
@@ -464,6 +465,38 @@ class Game {
       return triangleList;
    }
 
+   createCarShape(halfWidth, halfHeight, halfLength) {
+      const compoundSettings = new this.Jolt.StaticCompoundShapeSettings();
+
+      const mainBody = new this.Jolt.BoxShapeSettings(
+         new this.Jolt.Vec3(halfWidth, halfHeight, halfLength)
+      );
+      compoundSettings.AddShape(
+         new this.Jolt.Vec3(0, halfHeight, 0),
+         new this.Jolt.Quat(0, 0, 0, 1),
+         mainBody
+      );
+
+      const hood = new this.Jolt.BoxShapeSettings(
+         new this.Jolt.Vec3(halfWidth * 0.8, halfHeight * 0.6, halfLength * 0.27)
+      );
+      compoundSettings.AddShape(
+         new this.Jolt.Vec3(0, halfHeight * 1.4, halfLength * 0.68),
+         new this.Jolt.Quat(0, 0, 0, 1),
+         hood
+      );
+
+      const roof = new this.Jolt.BoxShapeSettings(
+         new this.Jolt.Vec3(halfWidth * 0.82, halfHeight * 0.8, halfLength * 0.45)
+      );
+      compoundSettings.AddShape(
+         new this.Jolt.Vec3(0, halfHeight * 2.2, halfLength * -0.11),
+         new this.Jolt.Quat(0, 0, 0, 1),
+         roof
+      );
+
+      return compoundSettings;
+   }
 
    createTrack() {
       this.setState(State.LOADING);
@@ -527,40 +560,55 @@ class Game {
          throw error;
       }
    }
+   createFrictionCurve(multiplier) {
+      const curve = new this.Jolt.LinearCurve();
+      const basePoints = [
+         [0.0, 1.0],
+         [0.1, 1.2],
+         [0.3, 0.8],
+         [1.0, 0.6]
+      ];
+
+      basePoints.forEach(([slip, friction]) => {
+         const scaledFriction = friction * multiplier;
+         curve.AddPoint(slip, scaledFriction);
+      });
+
+      return curve;
+   }
 
    createVehicle() {
       this.setState(State.LOADING);
       console.log("Creating vehicle");
 
+      // dimensions
       const wheelRadius = 0.55;
       const wheelWidth = 0.6;
 
       const halfVehicleLength = 4.445;
       const halfVehicleWidth = 1.695;
-      const halfVehicleHeight = 0.1;
+      const halfVehicleHeight = 0.9;
       const wheelBase = halfVehicleLength / 1.83;
 
       const wheelOffset = -0.2;
-      const wheelOffsetVertical = -0.67;
+      const wheelOffsetVertical = -0.64;
       const wheelOffsetLongitudal = 0.4;
-
-      const suspensionMinLength = 0.05;
-      const suspensionMaxLength = 0.3;
-      const suspensionPreloadLenght = 0.7;
-      const suspensionStiffness = 10;
-      const suspensionDamping = 1;
-      const suspensionFrequency = 1;
 
       const maxSteerAngle = this.degreesToRadians(55);
 
-      // LinearCurve multiplier
-      const frontTyreLateralFriction = 20;
-      const frontTyreLongitudalFriction = 5;
+      // multipliers
+      const suspensionMinLength = 1;
+      const suspensionMaxLength = 1;
+      const suspensionPreloadLenght = 1;
+      const suspensionStiffness = 1;
+      const suspensionDamping = 1;
+      const suspensionFrequency = 1;
+      const frontTyreLateralFriction = 15;
+      const frontTyreLongitudalFriction = 1;
+      const rearTyreLateralFriction = 2;
+      const rearTyreLongitudalFriction = 15;
 
-      // LinearCurve multiplier
-      const rearTyreLateralFriction = 5;
-      const rearTyreLongitudalFriction = 20;
-
+      // powertrain
       const transmissionMode = this.Jolt.ETransmissionMode_Auto;
       const fourWheelDrive = false;
       const torqueSplitRatio = 1.4;
@@ -568,7 +616,7 @@ class Game {
       const antiRollbar = true;
 
       const maxEngineTorque = 2500.0;
-      const clutchStrength = 100.0;
+      const clutchStrength = 1000.0;
       const minRPM = 400;
       const maxRPM = 10000;
       const damperMass = 1.0;
@@ -589,10 +637,10 @@ class Game {
       this.tempRVec.Set(10, 0, -30);
       this.tempQuat.Set(0, 180, 0, 1);
       try {
-         const carShapeSettings = new this.Jolt.OffsetCenterOfMassShapeSettings(new this.Jolt.Vec3(0, -halfVehicleHeight, 0),
-            new this.Jolt.BoxShapeSettings(new this.Jolt.Vec3(halfVehicleWidth, halfVehicleHeight, halfVehicleLength)));
-
-
+         const carShapeSettings = new this.Jolt.OffsetCenterOfMassShapeSettings(
+            new this.Jolt.Vec3(0, -halfVehicleHeight, 0),
+            this.createCarShape(halfVehicleWidth, halfVehicleHeight, halfVehicleLength)
+         );
 
          let carBody = null;
          Promise.all([
@@ -623,10 +671,6 @@ class Game {
             carModel.add(follow);
             goal.add(this.camera);
 
-            //carModel.scale.set(0.018, 0.018, 0.018);
-
-            carModel.position.set(-100, 0, 0);
-
             carBody = this.createAndAddBody(
                carShapeSettings,
                this.tempRVec,
@@ -645,29 +689,13 @@ class Game {
             vehicle.mWheels.clear();
             const mWheels = [];
             {
-               const frontLongitudinalCurve = new this.Jolt.LinearCurve();
-               frontLongitudinalCurve.AddPoint(0.05 * frontTyreLongitudalFriction, 1.2 * frontTyreLongitudalFriction);
-               frontLongitudinalCurve.Sort();
-
-
-               const frontLateralCurve = new this.Jolt.LinearCurve();
-               frontLateralCurve.AddPoint(0.1 * frontTyreLateralFriction, 1.15 * frontTyreLateralFriction);
-               frontLateralCurve.Sort();
-
-               const rearLongitudinalCurve = new this.Jolt.LinearCurve();
-               rearLongitudinalCurve.AddPoint(0.05 * rearTyreLongitudalFriction, 1.1 * rearTyreLongitudalFriction);
-               rearLongitudinalCurve.Sort();
-
-               const rearLateralCurve = new this.Jolt.LinearCurve();
-               rearLateralCurve.AddPoint(0.1 * rearTyreLateralFriction, 1.1 * rearTyreLateralFriction);
-               rearLateralCurve.Sort();
-
                const fl = new this.Jolt.WheelSettingsWV();
                fl.mPosition = new this.Jolt.Vec3((halfVehicleWidth + wheelOffset), -wheelOffsetVertical, wheelBase + wheelOffsetLongitudal);
                fl.set_mMaxSteerAngle(maxSteerAngle);
                fl.mMaxHandBrakeTorque = 0.0;
-               fl.set_mLateralFriction(frontLateralCurve);
-               fl.set_mLongitudinalFriction(frontLongitudinalCurve);
+               fl.set_mLateralFriction(this.createFrictionCurve(frontTyreLateralFriction));
+               fl.set_mLongitudinalFriction(this.createFrictionCurve(frontTyreLongitudalFriction));
+
                vehicle.mWheels.push_back(fl);
                mWheels.push(fl);
 
@@ -675,8 +703,8 @@ class Game {
                fr.mPosition = new this.Jolt.Vec3(-(halfVehicleWidth + wheelOffset), -wheelOffsetVertical, wheelBase + wheelOffsetLongitudal);
                fr.set_mMaxSteerAngle(maxSteerAngle);
                fr.mMaxHandBrakeTorque = 0.0;
-               fr.set_mLateralFriction(frontLateralCurve);
-               fr.set_mLongitudinalFriction(frontLongitudinalCurve);
+               fr.set_mLateralFriction(this.createFrictionCurve(frontTyreLateralFriction));
+               fr.set_mLongitudinalFriction(this.createFrictionCurve(frontTyreLongitudalFriction));
                vehicle.mWheels.push_back(fr);
                mWheels.push(fr);
 
@@ -684,8 +712,8 @@ class Game {
                bl.mPosition = new this.Jolt.Vec3((halfVehicleWidth + wheelOffset), -wheelOffsetVertical, -wheelBase + wheelOffsetLongitudal / 2);
                bl.set_mMaxSteerAngle(0);
                fr.mMaxHandBrakeTorque = 100.0;
-               bl.set_mLateralFriction(rearLateralCurve);
-               bl.set_mLongitudinalFriction(rearLongitudinalCurve);
+               bl.set_mLateralFriction(this.createFrictionCurve(rearTyreLateralFriction));
+               bl.set_mLongitudinalFriction(this.createFrictionCurve(rearTyreLongitudalFriction));
                vehicle.mWheels.push_back(bl);
                mWheels.push(bl);
 
@@ -693,27 +721,23 @@ class Game {
                br.mPosition = new this.Jolt.Vec3(-(halfVehicleWidth + wheelOffset), -wheelOffsetVertical, -wheelBase + wheelOffsetLongitudal / 2);
                br.set_mMaxSteerAngle(0);
                fr.mMaxHandBrakeTorque = 100.0;
-               br.set_mLateralFriction(rearLateralCurve);
-               br.set_mLongitudinalFriction(rearLongitudinalCurve);
+               br.set_mLateralFriction(this.createFrictionCurve(rearTyreLateralFriction));
+               br.set_mLongitudinalFriction(this.createFrictionCurve(rearTyreLongitudalFriction));
                vehicle.mWheels.push_back(br);
                mWheels.push(br);
 
-               this.Jolt.destroy(frontLateralCurve);
-               this.Jolt.destroy(frontLongitudinalCurve);
-               this.Jolt.destroy(rearLateralCurve);
-               this.Jolt.destroy(rearLongitudinalCurve);
             }
             mWheels.forEach(wheelS => {
                wheelS.mRadius = wheelRadius;
                wheelS.mWidth = wheelWidth;
-               wheelS.mSuspensionMinLength = suspensionMinLength;
-               wheelS.mSuspensionMaxLength = suspensionMaxLength;
-               wheelS.set_mSuspensionPreloadLength(suspensionPreloadLenght);
+               wheelS.set_mSuspensionMinLength(wheelS.get_mSuspensionMinLength() * suspensionMinLength);
+               wheelS.set_mSuspensionMaxLength(wheelS.get_mSuspensionMaxLength() * suspensionMaxLength);
+               wheelS.set_mSuspensionPreloadLength(wheelS.get_mSuspensionPreloadLength() * suspensionPreloadLenght);
 
                const spring = wheelS.get_mSuspensionSpring()
-               spring.set_mStiffness(suspensionStiffness);
-               spring.set_mFrequency(suspensionFrequency);
-               spring.set_mDamping(suspensionDamping);
+               spring.set_mStiffness(spring.get_mStiffness() * suspensionStiffness);
+               spring.set_mFrequency(spring.get_mFrequency() * suspensionFrequency);
+               spring.set_mDamping(spring.get_mDamping() * suspensionDamping);
             });
 
             const controllerSettings = new this.Jolt.WheeledVehicleControllerSettings();
