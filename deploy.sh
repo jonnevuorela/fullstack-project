@@ -20,6 +20,6 @@ echo "[$(date)] Running go build..."
 go build ./cmd/web
 
 echo "[$(date)] Restarting systemd service..."
-sudo systemctl restart game.jonnevuorela-web.service
+sudo systemctl restart game-jonnevuorela-web.service
 
 echo "===== Deployment completed successfully at $(date) ====="
