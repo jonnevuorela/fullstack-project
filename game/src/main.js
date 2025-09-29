@@ -18,6 +18,12 @@ const State = {
    LOADING: 2,
 };
 
+const NetworkState = {
+   CONNECTED: 0,
+   DISCONNECTED: 1,
+   CONNECTING: 2,
+};
+
 class Game {
    constructor() {
       // core
@@ -44,9 +50,17 @@ class Game {
       // ui
       this.state = State.LOADING;
       this.overlay = null;
+      this.overlayContent = null;
       this.canvasContainer = document.getElementById('gameCanvas');
-      this.uiOverlay = null;
+      this.uiOverlay = document.getElementById('gameUi');
+      this.uiDynamicContainer = null;
       this.currentRPM = 0;
+      this.RpmGaugeSvg = null;
+      this.RpmGaugeNeedle = null;
+
+
+      this.debugLog = [];
+      this.debugLogContainer = null;
 
       // player
       this.controls = null;
@@ -70,6 +84,11 @@ class Game {
 
       this.groundMesh = null;
       this.mapColors = [0x666666, 0x006600, 0x000066];
+
+      this.ws = null;
+      this.sendInterval = null;
+      this.networkState = null;
+      this.networkIcon = document.documentElement;
    }
 
    degreesToRadians(degrees) {
@@ -84,34 +103,265 @@ class Game {
       return new THREE.Quaternion(quat.GetX(), quat.GetY(), quat.GetZ(), quat.GetW());
    }
 
+
+   initOverlay() {
+      if (!this.overlay) {
+         this.overlay = document.createElement('div');
+         this.overlay.className = 'game-overlay';
+         this.overlayContent = document.createElement('div');
+         this.overlayContent.className = 'overlay-content';
+         this.overlay.appendChild(this.overlayContent);
+         this.canvasContainer.appendChild(this.overlay);
+      }
+      if (!this.uiOverlay) {
+         this.uiOverlay = document.createElement('div');
+         this.uiOverlay.className = 'game-ui';
+
+         // AI genereoitu svg - locaali qwen3-coder-30b
+         // how could we make a svg that simulates a rpm gauge that edits with the rpm value of the game with the addUiElement function
+         this.uiOverlay.innerHTML = `
+              <div class="rpm-meter">
+             <svg id="rpm-gauge" width="200" height="200" viewBox="0 0 200 200">
+               <circle cx="100" cy="100" r="95" fill="#222" stroke="#444" stroke-width="2"/>
+               <g id="tickMarks"></g>
+               <text x="100" y="180" text-anchor="middle" fill="#808080" font-size="18">RPM</text>
+               <text x="50" y="165" text-anchor="middle" fill="#808080" font-size="12">0</text>
+               <text x="160" y="90" text-anchor="middle" fill="#808080" font-size="12">10000</text>
+               <!-- Needle (starts vertical) -->
+               <line id="rpm-needle" x1="100" y1="100" x2="100" y2="35" stroke="#f00" stroke-width="4"/>
+               <circle cx="100" cy="100" r="6" fill="#fff"/>
+             </svg>
+             <div id="rpm-value" style="text-align:center;font-size:16px;color:#fff;margin-top:6px;">0 RPM</div>
+           </div>
+           <div class="network-status-icon"></div>
+           <div id="ui-dynamic"></div>
+         `;
+         this.canvasContainer.appendChild(this.uiOverlay);
+
+         this.addTickMarks();
+         // Keep reference for adding elements later
+         this.uiDynamicContainer = this.uiOverlay.querySelector('#ui-dynamic');
+         this.RpmGaugeSvg = this.uiOverlay.querySelector('#rpm-gauge');
+         this.RpmGaugeNeedle = this.uiOverlay.querySelector('#rpm-needle');
+         this.RpmGaugeValue = this.uiOverlay.querySelector('#rpm-value');
+      }
+   }
+   // AI genereoitu svg - locaali qwen3-coder-30b
+   // the svg layout looks like what i want now, can you add marker lines aftear each 1000rpm and add redline to end
+   addTickMarks() {
+      const tickContainer = document.getElementById('tickMarks');
+      const maxRPM = 10000;
+      const minRPM = 0;
+
+      const sweep = 230;
+      const base = -235;
+
+      for (let i = 0; i <= maxRPM; i += 1000) {
+         // Angle for this tick
+         const angle = ((i - minRPM) / (maxRPM - minRPM)) * sweep;
+         const theta = angle + base; // actual angle for this tick mark
+
+         const x1 = 100 + 85 * Math.cos(theta * Math.PI / 180);
+         const y1 = 100 + 85 * Math.sin(theta * Math.PI / 180);
+         const x2 = 100 + 95 * Math.cos(theta * Math.PI / 180);
+         const y2 = 100 + 95 * Math.sin(theta * Math.PI / 180);
+
+         const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+         line.setAttribute('x1', x1);
+         line.setAttribute('y1', y1);
+         line.setAttribute('x2', x2);
+         line.setAttribute('y2', y2);
+         line.setAttribute('stroke', '#fff');
+         line.setAttribute('stroke-width', '2');
+         tickContainer.appendChild(line);
+      }
+
+      // Redline at maxRPM
+      const angle = sweep + base;
+      const rx1 = 100 + 85 * Math.cos(angle * Math.PI / 180);
+      const ry1 = 100 + 85 * Math.sin(angle * Math.PI / 180);
+      const rx2 = 100 + 95 * Math.cos(angle * Math.PI / 180);
+      const ry2 = 100 + 95 * Math.sin(angle * Math.PI / 180);
+
+      const redline = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      redline.setAttribute('x1', rx1);
+      redline.setAttribute('y1', ry1);
+      redline.setAttribute('x2', rx2);
+      redline.setAttribute('y2', ry2);
+      redline.setAttribute('stroke', 'red');
+      redline.setAttribute('stroke-width', '3');
+      tickContainer.appendChild(redline);
+   }
+
+   addDebugLog(type, text, ttl = 10) {
+      const now = new Date();
+      const timeStr = now.toLocaleTimeString('en-US', { hour12: false });
+      const entry = { type, text, time: timeStr, ttl };
+
+      this.debugLog.push(entry);
+      this.renderDebugLog();
+
+      setTimeout(() => {
+         const idx = this.debugLog.indexOf(entry);
+         if (idx !== -1) {
+            this.debugLog.splice(idx, 1);
+            this.renderDebugLog();
+         }
+      }, ttl * 1000);
+   }
+
+   addUiElement(htmlOrNode, ttl = null) {
+      let node;
+      if (typeof htmlOrNode === 'string') {
+         node = document.createElement('div');
+         node.innerHTML = htmlOrNode;
+         node = node.firstElementChild || node;
+      } else {
+         node = htmlOrNode;
+      }
+
+      const closeBtn = node.querySelector('.close-pop');
+      if (closeBtn) {
+         closeBtn.onclick = () => {
+            if (node.parentNode) node.parentNode.removeChild(node);
+         };
+      }
+
+      this.uiDynamicContainer.appendChild(node);
+
+      if (ttl && typeof ttl === 'number' && ttl > 0) {
+         setTimeout(() => {
+            if (node.parentNode === this.uiDynamicContainer) {
+               this.uiDynamicContainer.removeChild(node);
+            }
+         }, ttl * 1000);
+      }
+      return node;
+   }
+
+   renderDebugLog() {
+      if (!this.debugLogContainer) {
+         this.debugLogContainer = document.createElement('div');
+         this.debugLogContainer.className = 'debug-log';
+         this.canvasContainer.appendChild(this.debugLogContainer);
+      }
+      this.debugLogContainer.innerHTML = this.debugLog.map(entry => `
+         <div class="debug-log-entry debug-${entry.type}">
+           <span class="debug-time">${entry.time}</span>
+           <span class="debug-text">${entry.text}</span>
+         </div>
+      `).join('');
+      this.debugLogContainer.scrollTop = this.debugLogContainer.scrollHeight;
+   }
+
+   renderUi() {
+      this.uiOverlay.innerHTML.replace(this.uiOverlayContent);
+   }
+
    showSpinner() {
-      this.hideOverlay();
-      this.overlay = document.createElement('div');
-      this.overlay.className = 'game-overlay spinner';
-      this.overlay.innerHTML = `<div class="spinner"></div>`;
-      this.canvasContainer.appendChild(this.overlay);
+      this.showSpinnerOverlay();
+   }
+
+   showSpinnerOverlay() {
+      if (!this.spinnerOverlay) {
+         this.spinnerOverlay = document.createElement('div');
+         this.spinnerOverlay.className = 'spinner-overlay';
+         const spinner = document.createElement('div');
+         spinner.className = 'spinner';
+         this.spinnerOverlay.appendChild(spinner);
+         this.canvasContainer.appendChild(this.spinnerOverlay);
+      }
+   }
+
+   hideSpinner() {
+      this.hideSpinnerOverlay();
+   }
+
+   hideSpinnerOverlay() {
+      if (this.spinnerOverlay) {
+         this.spinnerOverlay.remove();
+         this.spinnerOverlay = null;
+      }
    }
 
    showError(message) {
-      this.hideOverlay();
-      this.overlay = document.createElement('div');
-      this.overlay.className = 'game-overlay error';
-      this.overlay.innerHTML = `<p>${message || "An error occurred."}</p>`;
-      this.canvasContainer.appendChild(this.overlay);
+      this.initOverlay();
+      this.overlayContent.innerHTML = `<div class="overlay-error">${message || "An error occurred."}</div>`;
    }
 
-   hideOverlay() {
-      if (this.overlay && this.canvasContainer.contains(this.overlay)) {
-         this.canvasContainer.removeChild(this.overlay);
+   clearError() {
+      this.initOverlay();
+      this.overlayContent.innerHTML = "";
+   }
+
+   showNetworkIcon() {
+      this.initOverlay();
+      let icon = this.overlayContent.querySelector('.network-icon');
+      if (!icon) {
+         icon = document.createElement('div');
+         icon.className = 'network-icon';
+         this.overlayContent.appendChild(icon);
       }
-      this.overlay = null;
+      this.networkIcon = icon;
+   }
+
+   setNetworkState(state) {
+      this.showNetworkIcon();
+      let color = '#808080';
+      if (state === NetworkState.CONNECTING) color = '#edc001';
+      if (state === NetworkState.CONNECTED) color = '#0b6623';
+      if (state === NetworkState.DISCONNECTED) color = '#ed4337';
+      this.networkIcon.style.backgroundColor = color;
    }
 
    setState(newState, errorMessage) {
-      this.state = newState;
-      if (this.state === State.LOADING) this.showSpinner();
-      else if (this.state === State.ERROR) this.showError(errorMessage);
-      else this.hideOverlay();
+      this.initOverlay();
+      if (newState === State.LOADING) {
+         this.showSpinner();
+         this.clearError();
+      } else if (newState === State.ERROR) {
+         this.hideSpinner();
+         this.showError(errorMessage);
+         let logMsg = '';
+         if (errorMessage instanceof Error) {
+            logMsg = errorMessage.message;
+         } else {
+            logMsg = errorMessage || "An error occurred.";
+         }
+         this.addDebugLog('error', logMsg);
+      } else if (newState === State.READY) {
+         this.hideSpinner();
+         this.clearError();
+      }
+   }
+
+   // AI genereoitu - locaali qwen3-coder-30b
+   // how could we make a svg that simulates a rpm gauge that edits with the rpm value of the game with the addUiElement function
+   updateRpmGauge() {
+      if (!this.RpmGaugeNeedle || !this.vehicleEngine) return;
+
+      const maxRpm = this.vehicleEngine.get_mMaxRPM();
+      const currentRpm = Math.max(0, Math.min(this.currentRPM, maxRpm));
+
+      // Needle angle: -120 deg = minRpm, +120 deg = maxRpm (arc from left to right)
+      const startAngle = -230;
+      const endAngle = -20;
+      const range = endAngle - startAngle;
+      const normalized = (currentRpm - 0) / (maxRpm - 0);
+      const angle = startAngle + range * normalized;
+      const rad = angle * Math.PI / 180;
+
+      // Needle coordinates
+      const centerX = 100, centerY = 100, needleLen = 65;
+      const x2 = centerX + needleLen * Math.cos(rad);
+      const y2 = centerY + needleLen * Math.sin(rad);
+
+      this.RpmGaugeNeedle.setAttribute('x2', x2);
+      this.RpmGaugeNeedle.setAttribute('y2', y2);
+
+      if (this.RpmGaugeValue) {
+         this.RpmGaugeValue.textContent = `${Math.round(currentRpm)} RPM`;
+      }
    }
 
    async initPhysics() {
@@ -197,17 +447,12 @@ class Game {
          this.controls = new OrbitControls(this.camera, this.renderer.domElement);
 
 
-         this.uiOverlay = document.createElement('div');
-         this.uiOverlay.id = 'ui-display';
-         this.uiOverlay.className = 'game-overlay';
-         this.uiOverlay.innerHTML = '<span id="rpm-value">0 RPM</span>';
-         this.canvasContainer.appendChild(this.uiOverlay);
-
          window.addEventListener('resize', () => {
             this.camera.aspect = window.innerWidth / window.innerHeight;
             this.camera.updateProjectionMatrix();
             this.renderer.setSize(window.innerWidth, window.innerHeight);
          });
+
 
          this.texLoader = new THREE.TextureLoader();
       } catch (error) {
@@ -519,7 +764,7 @@ class Game {
                console.log("Road model loaded successfully");
                const roadModel = roadGltf.scene.clone();
 
-               roadModel.position.set(0, -16, 0);
+               roadModel.position.set(0, 0, 0);
                roadModel.quaternion.set(0, 0, 0, 1);
 
                const triangleList = this.createTriangleListFromThreeObject(roadModel);
@@ -1085,6 +1330,8 @@ class Game {
 
          this.handleCamera();
 
+         this.updateRpmGauge();
+
          if (this.controls) this.controls.update();
 
          this.renderer.render(this.scene, this.camera);
@@ -1183,9 +1430,62 @@ class Game {
       }
    }
 
+   websocketConnect() {
+      //  this.setState(State.LOADING);
+      this.setNetworkState(NetworkState.CONNECTING);
+      this.ws = new WebSocket('ws://localhost:4000/ws');
+      if (!this.ws) {
+         throw new Error("WebSocket creation failed");
+      }
+
+      let counter = 0;
+
+      const cleanup = () => {
+         if (this.sendInterval) {
+            clearInterval(this.sendInterval);
+            this.sendInterval = null;
+         }
+      };
+
+      this.ws.addEventListener("error", (error) => {
+         console.error("WebSocket error:", error);
+         this.setState(State.ERROR, error);
+         this.setNetworkState(NetworkState.DISCONNECTED);
+         cleanup();
+      });
+
+      this.ws.addEventListener("open", () => {
+         console.log("websocket connected");
+         this.setState(State.READY);
+         this.setNetworkState(NetworkState.CONNECTED);
+
+         if (this.sendInterval) {
+            clearInterval(this.sendInterval);
+         }
+
+         this.sendInterval = setInterval(() => {
+            if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+               ++counter
+               console.log(`CLIENT SENT: ping: ${counter}`);
+               this.ws.send("ping");
+            } else {
+               console.log("WebSocket not open");
+               cleanup();
+            }
+         }, 1000);
+      });
+
+      this.ws.addEventListener("close", (event) => {
+         console.log("WebSocket closed:", event.code, event.reason);
+         this.setNetworkState(NetworkState.DISCONNECTED);
+         this.addDebugLog("network", `websocket closed ${event.reason}`);
+         cleanup();
+      });
+   }
    async init() {
       console.log("Starting game for player:", this.playerId);
       try {
+         try { this.websocketConnect(); } catch (e) { throw e }
 
          try { this.initScene(); } catch (e) { throw e }
          this.gltfLoader = new GLTFLoader();
@@ -1213,9 +1513,26 @@ class Game {
 
          console.log("Game initialized successfully");
 
+         this.addDebugLog('info', 'Debug log initialized');
          this.setState(State.READY);
          this.animate();
 
+         this.addUiElement(`<div class="game-hint">
+             <span>WASD: Drive</span><br>
+             <span>Space: Handbrake</span>
+             <!-- add more hints -->
+           </div>`,
+            10);
+         this.addUiElement(`
+              <div class="game-pop">
+                <button class="close-pop" title="Close">&times;</button>
+                <h1>Buy the BattlePass!</h1>
+                <p>For a good price of 100€, you can get the battlepass for yourself today!</p>
+                <p>With the battlepass you can keep up your interest in playing this game, that you wouldn't otherwise have!</p>
+                <p>You can grind levels to earn limited time cosmetics that gives you fear of missing out and nobody wants to see.</p>
+              </div>
+            `
+            , 15);
       } catch (error) {
          console.error("Failed to initialize game:", error);
          this.setState(State.ERROR, error.message);
@@ -1225,6 +1542,7 @@ class Game {
 
    cleanup() {
       console.log("Cleaning up physics resources");
+
 
       if (this.controlHandlers) {
          document.removeEventListener('keydown', this.controlHandlers.keyDown);
