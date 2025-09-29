@@ -2,14 +2,6 @@
 {{define "main"}}
     <div class="game-container">
         <div id="gameCanvas"/></div>
-        <div class="game-controls">
-            <h3>Controls:</h3>
-            <p>W: Accelerate</p>
-            <p>S: Brake</p>
-            <p>A: Steer Left</p>
-            <p>D: Steer Right</p>
-            <p>Space: Handbrake</p>
-        </div>
     </div>
     <script nonce="{{.Nonce}}">const playerId = "{{.PlayerID}}";</script>
     <script type="module" nonce="{{.Nonce}}" src="/static/game/game.bundle.js"></script>
