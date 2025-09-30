@@ -7,6 +7,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 
 import initJolt from 'jolt-physics';
+import { velocity } from 'three/src/nodes/TSL.js';
 
 const LAYER_NON_MOVING = 0;
 const LAYER_MOVING = 1;
@@ -65,6 +66,7 @@ class Game {
       // player
       this.controls = null;
       this.playerPosition = null;
+      this.playerVelocity = null;
       this.playerController = null;
       this.keyState = {};
       this.playerId = window.playerId || 123;
@@ -77,6 +79,7 @@ class Game {
       this.wheelModelR = null;
       this.vehicleWheels = [];
       this.vehicleStepListener = null;
+
 
       // vehicle setup
       this.vehicleEngine = null;
@@ -200,6 +203,7 @@ class Game {
 
       this.debugLog.push(entry);
       this.renderDebugLog();
+      console.log(`${type}: ${text}`)
 
       setTimeout(() => {
          const idx = this.debugLog.indexOf(entry);
@@ -710,39 +714,6 @@ class Game {
       return triangleList;
    }
 
-   createCarShape(halfWidth, halfHeight, halfLength) {
-      const compoundSettings = new this.Jolt.StaticCompoundShapeSettings();
-
-      const mainBody = new this.Jolt.BoxShapeSettings(
-         new this.Jolt.Vec3(halfWidth, halfHeight, halfLength)
-      );
-      compoundSettings.AddShape(
-         new this.Jolt.Vec3(0, halfHeight, 0),
-         new this.Jolt.Quat(0, 0, 0, 1),
-         mainBody
-      );
-
-      const hood = new this.Jolt.BoxShapeSettings(
-         new this.Jolt.Vec3(halfWidth * 0.8, halfHeight * 0.6, halfLength * 0.27)
-      );
-      compoundSettings.AddShape(
-         new this.Jolt.Vec3(0, halfHeight * 1.4, halfLength * 0.68),
-         new this.Jolt.Quat(0, 0, 0, 1),
-         hood
-      );
-
-      const roof = new this.Jolt.BoxShapeSettings(
-         new this.Jolt.Vec3(halfWidth * 0.82, halfHeight * 0.8, halfLength * 0.45)
-      );
-      compoundSettings.AddShape(
-         new this.Jolt.Vec3(0, halfHeight * 2.2, halfLength * -0.11),
-         new this.Jolt.Quat(0, 0, 0, 1),
-         roof
-      );
-
-      return compoundSettings;
-   }
-
    createTrack() {
       this.setState(State.LOADING);
       console.log("Creating track");
@@ -750,11 +721,11 @@ class Game {
          Promise.all([
             new Promise((resolve, reject) => {
                this.gltfLoader.load(
-                  "static/gameAssets/road.glb",
+                  "static/gameAssets/map.glb",
                   resolve,
-                  (progress) => console.log(`Loading road.glb: ${progress.loaded}/${progress.total} bytes`),
+                  (progress) => console.log(`Loading map.glb: ${progress.loaded}/${progress.total} bytes`),
                   (error) => {
-                     console.error("Failed to load road.glb:", error);
+                     console.error("Failed to load map.glb:", error);
                      reject(error);
                   }
                );
@@ -822,9 +793,49 @@ class Game {
       return curve;
    }
 
+   createCarShape(halfWidth, halfHeight, halfLength) {
+      const compoundSettings = new this.Jolt.StaticCompoundShapeSettings();
+
+      const mainBody = new this.Jolt.BoxShapeSettings(
+         new this.Jolt.Vec3(halfWidth, halfHeight, halfLength)
+      );
+      compoundSettings.AddShape(
+         new this.Jolt.Vec3(0, halfHeight, 0),
+         new this.Jolt.Quat(0, 0, 0, 1),
+         mainBody
+      );
+
+      const hood = new this.Jolt.BoxShapeSettings(
+         new this.Jolt.Vec3(halfWidth * 0.8, halfHeight * 0.6, halfLength * 0.27)
+      );
+      compoundSettings.AddShape(
+         new this.Jolt.Vec3(0, halfHeight * 1.4, halfLength * 0.68),
+         new this.Jolt.Quat(0, 0, 0, 1),
+         hood
+      );
+
+      const roof = new this.Jolt.BoxShapeSettings(
+         new this.Jolt.Vec3(halfWidth * 0.82, halfHeight * 0.8, halfLength * 0.45)
+      );
+      compoundSettings.AddShape(
+         new this.Jolt.Vec3(0, halfHeight * 2.2, halfLength * -0.11),
+         new this.Jolt.Quat(0, 0, 0, 1),
+         roof
+      );
+
+      return compoundSettings;
+   }
+
+   createUnitCylinder(radius = 0.05, material = new THREE.MeshPhongMaterial({ color: 0x222222 }), radialSegments = 8) {
+      // unit-length cylinder centered at origin (height = 1)
+      const geom = new THREE.CylinderGeometry(radius, radius, 1.0, radialSegments);
+      const mesh = new THREE.Mesh(geom, material);
+      mesh.userData.unitLength = 1.0;
+      return mesh;
+   }
+
    createVehicle() {
       this.setState(State.LOADING);
-      console.log("Creating vehicle");
 
       // dimensions
       const wheelRadius = 0.55;
@@ -839,10 +850,10 @@ class Game {
       const wheelOffsetVertical = -0.64;
       const wheelOffsetLongitudal = 0.4;
 
-      const maxSteerAngle = this.degreesToRadians(55);
+      const maxSteerAngle = this.degreesToRadians(60);
 
       // multipliers
-      const suspensionMinLength = 1;
+      const suspensionMinLength = 0.4;
       const suspensionMaxLength = 1;
       const suspensionPreloadLenght = 1;
       const suspensionStiffness = 1;
@@ -876,8 +887,6 @@ class Game {
 
       const wheelRight = new this.Jolt.Vec3(0, 1, 0);
       const wheelUp = new this.Jolt.Vec3(1, 0, 0);
-
-
 
       this.tempRVec.Set(10, 0, -30);
       this.tempQuat.Set(0, 180, 0, 1);
@@ -932,6 +941,8 @@ class Game {
             const vehicle = new this.Jolt.VehicleConstraintSettings();
             vehicle.mMaxPitchRollAngle = this.degreesToRadians(60);
             vehicle.mWheels.clear();
+
+            // wheel settings
             const mWheels = [];
             {
                const fl = new this.Jolt.WheelSettingsWV();
@@ -1071,11 +1082,11 @@ class Game {
             controllerCallbacks.SetWheeledVehicleController(this.playerController);
             this.controllerCallbacks = controllerCallbacks;
 
+            // wheel creation
             const createThreeWheel = (constraint, wheelIndex, body) => {
                const joltWheel = constraint.GetWheel(wheelIndex);
                const wheelSetting = joltWheel.GetSettings();
 
-               const scaleRatio = wheelSetting.mRadius / 0.5;
                const isLeftSide = wheelIndex === 0 || wheelIndex === 2;
 
                let wheel;
@@ -1086,34 +1097,60 @@ class Game {
                   wheel = this.wheelGltfR.scene.clone();
                   wheel.rotation.x = Math.PI / 2;
                }
-               const additionalScaleFactor = 0.7;
-               wheel.scale.set(
-                  scaleRatio * additionalScaleFactor,
-                  scaleRatio * additionalScaleFactor,
-                  scaleRatio * additionalScaleFactor
-               );
-               wheel.scale.set(scaleRatio, scaleRatio, scaleRatio);
+
                body.add(wheel);
 
-               wheel.updateLocalTransform = () => {
-                  let transform = constraint.GetWheelLocalTransform(wheelIndex, wheelRight, wheelUp);
-                  wheel.position.copy(this.wrapVec3(transform.GetTranslation()));
-                  const wheelRotation = this.wrapQuat(transform.GetRotation().GetQuaternion());
-                  wheel.quaternion.copy(wheelRotation);
-                  if (isLeftSide) {
-                     wheel.rotateX(-Math.PI / 2);
-                  } else {
-                     wheel.rotateX(Math.PI / 2);
+               // AI generoitu - ChatGPT 5 mini
+               // Create functions for procedurally generating controlarms that
+               // interconnect on vehicle center and center of the wheel.
+               // create control arm as reusable unit cylinder
+               const armMaterial = new THREE.MeshPhongMaterial({ color: 0x444444 });
+               const controlArm = this.createUnitCylinder(0.04, armMaterial, 8);
+               controlArm.visible = true;
+               body.add(controlArm);
+
+               const updater = {
+                  wheel,
+                  controlArm,
+                  updateLocalTransform: () => {
+                     try {
+                        // wheel update
+                        const transform = constraint.GetWheelLocalTransform(wheelIndex, wheelRight, wheelUp);
+                        const wheelPos = this.wrapVec3(transform.GetTranslation());
+                        wheel.position.copy(wheelPos);
+                        const wheelQuat = this.wrapQuat(transform.GetRotation().GetQuaternion());
+                        wheel.quaternion.copy(wheelQuat);
+                        if (isLeftSide) wheel.rotateX(-Math.PI / 2); else wheel.rotateX(Math.PI / 2);
+
+
+                        // control arm update
+                        const cp = new THREE.Vector3(0, 0, wheelPos.z);
+                        const dir = new THREE.Vector3().subVectors(cp, wheelPos);
+                        const length = dir.length();
+                        if (length < 1e-6) controlArm.visible = false;
+                        else {
+                           controlArm.visible = true;
+                           const midpoint = new THREE.Vector3().addVectors(wheelPos, cp).multiplyScalar(0.5);
+                           const up = new THREE.Vector3(0, 1, 0);
+                           const q = new THREE.Quaternion().setFromUnitVectors(up, dir.clone().normalize());
+                           controlArm.position.copy(midpoint);
+                           controlArm.setRotationFromQuaternion(q);
+                           controlArm.scale.set(1, length / controlArm.userData.unitLength, 1);
+                        }
+                     } catch (err) {
+                        this.addDebugLog('error', err);
+                     }
                   }
                };
+               updater.updateLocalTransform();
 
-               wheel.updateLocalTransform();
-               return wheel;
+               return updater;
             };
 
             this.vehicleWheels = [];
             for (let i = 0; i < vehicle.mWheels.size(); i++) {
-               this.vehicleWheels.push(createThreeWheel(this.vehicle, i, vehicleMesh));
+               const updater = createThreeWheel(this.vehicle, i, vehicleMesh);
+               this.vehicleWheels.push(updater);
             }
 
             const stepListener = new this.Jolt.VehicleConstraintStepListener(this.vehicle);
@@ -1207,10 +1244,16 @@ class Game {
 
          forward = input.forwardPressed ? 1.0 : (input.backwardPressed ? -1.0 : 0.0);
          right = input.rightPressed ? 1.0 : (input.leftPressed ? -1.0 : 0.0);
+         const linearV = this.wrapVec3(this.vehicleBody.GetLinearVelocity());
+         this.playerVelocity = {
+            x: Math.round(linearV.getComponent(0)),
+            y: Math.round(linearV.getComponent(1)),
+            z: Math.round(linearV.getComponent(2))
+         };
+
 
          if (this.previousForward * forward < 0.0) {
             const rotation = this.wrapQuat(this.vehicleBody.GetRotation().Conjugated());
-            const linearV = this.wrapVec3(this.vehicleBody.GetLinearVelocity());
             const velocity = linearV.applyQuaternion(rotation).z;
 
             if ((forward > 0.0 && velocity < -0.1) || (forward < 0.0 && velocity > 0.1)) {
@@ -1232,7 +1275,15 @@ class Game {
             this.bodyInterface.ActivateBody(this.vehicleBody.GetID());
          }
 
-         this.vehicleWheels.forEach(wheel => wheel.updateLocalTransform());
+
+         if (this.vehicleWheels && this.vehicleWheels.length) {
+            this.vehicleWheels.forEach(entry => {
+               if (entry && typeof entry.updateLocalTransform === 'function') {
+                  entry.updateLocalTransform();
+               }
+            });
+         }
+
          this.currentRPM = this.vehicleEngine.GetCurrentRPM();
 
          this.uiOverlay.querySelector('#rpm-value').textContent = `${Math.round(this.currentRPM)} RPM`
@@ -1274,6 +1325,12 @@ class Game {
 
       const vehiclePosition = new THREE.Vector3();
       this.vehicleMesh.getWorldPosition(vehiclePosition);
+      this.playerPosition = {
+         x: Math.round(vehiclePosition.getComponent(0)),
+         y: Math.round(vehiclePosition.getComponent(1)),
+         z: Math.round(vehiclePosition.getComponent(2))
+      };
+
 
       const velocity = this.wrapVec3(this.vehicleBody.GetLinearVelocity());
       const speed = velocity.length();
@@ -1455,7 +1512,7 @@ class Game {
       });
 
       this.ws.addEventListener("open", () => {
-         console.log("websocket connected");
+         this.addDebugLog("info", "Websocket connected");
          this.setState(State.READY);
          this.setNetworkState(NetworkState.CONNECTED);
 
@@ -1466,25 +1523,48 @@ class Game {
          this.sendInterval = setInterval(() => {
             if (this.ws && this.ws.readyState === WebSocket.OPEN) {
                ++counter
-               console.log(`CLIENT SENT: ping: ${counter}`);
-               this.ws.send("ping");
+
+               this.addDebugLog('info', `ws\nplayerId: ${this.playerId}`);
+               this.addDebugLog('info', `ws\npos:\n      x:${this.playerPosition.x}\n      y:${this.playerPosition.y}\n      z:${this.playerPosition.z}`);
+               this.addDebugLog('info', `ws\nvel:\n      x:${this.playerVelocity.x}\n      y:${this.playerVelocity.y}\n      z:${this.playerVelocity.z}`);
+               let packet;
+               if (isNaN(this.playerId) ||
+                  isNaN(this.playerPosition.x) || isNaN(this.playerPosition.y) || isNaN(this.playerPosition.z) ||
+                  isNaN(this.playerVelocity.x) || isNaN(this.playerVelocity.y) || isNaN(this.playerVelocity.z)) {
+
+                  packet = null;
+               } else {
+                  packet = {
+                     playerId: this.playerId,
+                     position: this.playerPosition,
+                     velocity: this.playerVelocity
+                  }
+
+                  const packetStr = JSON.stringify(packet, null, 2);
+                  this.addDebugLog('info', `CLIENT SENT: packet #${counter}\n${packetStr}`);
+                  try {
+                     this.ws.send(packetStr);
+                  } catch (e) {
+                     this.addDebugLog('error', `WebSocket send failed: ${e.message}`);
+                  }
+               }
             } else {
-               console.log("WebSocket not open");
+               this.log('info', "Websocket not open, not sending messages")
                cleanup();
             }
          }, 1000);
       });
 
       this.ws.addEventListener("close", (event) => {
-         console.log("WebSocket closed:", event.code, event.reason);
          this.setNetworkState(NetworkState.DISCONNECTED);
-         this.addDebugLog("network", `websocket closed ${event.reason}`);
+         this.addDebugLog("info", `websocket closed. ${event.code} ${event.reason}`);
          cleanup();
       });
    }
    async init() {
-      console.log("Starting game for player:", this.playerId);
       try {
+         this.addDebugLog('info', 'Debug log initialized');
+         this.addDebugLog('info', `Player id: ${this.playerId}`)
          try { this.websocketConnect(); } catch (e) { throw e }
 
          try { this.initScene(); } catch (e) { throw e }
@@ -1496,14 +1576,15 @@ class Game {
          try { await this.initPhysics(); } catch (e) { throw e }
 
 
+         try { this.createVehicle(); } catch (e) { throw e }
          try { this.createGround(); } catch (e) { throw e }
          try { this.createTrack(); } catch (e) { throw e }
 
-         try { this.createVehicle(); } catch (e) { throw e }
 
          try { this.createPyramid(); } catch (e) { throw e }
 
          try { this.createProps(); } catch (e) { throw e }
+
 
          // cars spawn position. gltf loading happens async so the other translations messes it up.
          this.tempRVec.Set(-40, 0, -40);
@@ -1511,9 +1592,7 @@ class Game {
 
          try { this.setupControls(); } catch (e) { throw e }
 
-         console.log("Game initialized successfully");
 
-         this.addDebugLog('info', 'Debug log initialized');
          this.setState(State.READY);
          this.animate();
 
@@ -1523,16 +1602,16 @@ class Game {
              <!-- add more hints -->
            </div>`,
             10);
-         this.addUiElement(`
-              <div class="game-pop">
-                <button class="close-pop" title="Close">&times;</button>
-                <h1>Buy the BattlePass!</h1>
-                <p>For a good price of 100€, you can get the battlepass for yourself today!</p>
-                <p>With the battlepass you can keep up your interest in playing this game, that you wouldn't otherwise have!</p>
-                <p>You can grind levels to earn limited time cosmetics that gives you fear of missing out and nobody wants to see.</p>
-              </div>
-            `
-            , 15);
+         // this.addUiElement(`
+         //      <div class="game-pop">
+         //        <button class="close-pop" title="Close">&times;</button>
+         //        <h1>Buy the BattlePass!</h1>
+         //        <p>For a good price of 100€, you can get the battlepass for yourself today!</p>
+         //        <p>With the battlepass you can keep up your interest in playing this game, that you wouldn't otherwise have!</p>
+         //        <p>You can grind levels to earn limited time cosmetics that gives you fear of missing out and nobody wants to see.</p>
+         //      </div>
+         //    `
+         //    , 15);
       } catch (error) {
          console.error("Failed to initialize game:", error);
          this.setState(State.ERROR, error.message);
