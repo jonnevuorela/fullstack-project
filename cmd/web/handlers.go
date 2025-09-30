@@ -1,7 +1,6 @@
 package main
 
 import (
-	"log"
 	"net/http"
 )
 
@@ -20,23 +19,23 @@ func (app *application) game(writer http.ResponseWriter, request *http.Request) 
 func (app *application) websocket(w http.ResponseWriter, r *http.Request) {
 	conn, err := app.upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		log.Printf("WebSocket upgrade error: %v", err)
+		app.infoLog.Printf("WebSocket upgrade error: %v", err)
 		return
 	}
 	defer conn.Close()
 
-	log.Println("WebSocket connected")
+	app.infoLog.Printf("WebSocket connected: %v", conn.LocalAddr().String())
 
 	for {
 		var msg map[string]interface{}
 		err := conn.ReadJSON(&msg)
 		if err != nil {
-			log.Printf("WebSocket read error: %v", err)
+			app.infoLog.Printf("WebSocket read error: %v", err)
 			break
 		}
 		playerID, _ := msg["player_id"].(float64)
 		action, _ := msg["action"].(map[string]interface{})
-		log.Printf("Received from player %v: %v", int(playerID), action)
+		app.infoLog.Printf("Received from player %v: %v", int(playerID), action)
 
 		response := map[string]interface{}{
 			"entities": []map[string]interface{}{
@@ -49,11 +48,11 @@ func (app *application) websocket(w http.ResponseWriter, r *http.Request) {
 		}
 		err = conn.WriteJSON(response)
 		if err != nil {
-			log.Printf("WebSocket write error: %v", err)
+			app.infoLog.Printf("WebSocket write error: %v", err)
 			break
 		}
 	}
-	log.Println("WebSocket disconnected")
+	app.infoLog.Println("WebSocket disconnected")
 }
 
 func ping(writer http.ResponseWriter, request *http.Request) {
