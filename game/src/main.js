@@ -7,7 +7,6 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 
 import initJolt from 'jolt-physics';
-import { velocity } from 'three/src/nodes/TSL.js';
 
 const LAYER_NON_MOVING = 0;
 const LAYER_MOVING = 1;
@@ -256,10 +255,6 @@ class Game {
          </div>
       `).join('');
       this.debugLogContainer.scrollTop = this.debugLogContainer.scrollHeight;
-   }
-
-   renderUi() {
-      this.uiOverlay.innerHTML.replace(this.uiOverlayContent);
    }
 
    showSpinner() {
@@ -608,7 +603,7 @@ class Game {
       this.setState(State.LOADING);
       console.log("Creating ground");
       try {
-         this.tempRVec.Set(0, -16, 0);
+         this.tempRVec.Set(0, -0.1, 0);
          this.tempQuat.Set(0, 0, 0, 1);
 
          const groundShapeSettings = new this.Jolt.BoxShapeSettings(
@@ -714,68 +709,120 @@ class Game {
       return triangleList;
    }
 
-   createTrack() {
+   async createMap() {
       this.setState(State.LOADING);
-      console.log("Creating track");
+      console.log("Creating map");
       try {
-         Promise.all([
-            new Promise((resolve, reject) => {
-               this.gltfLoader.load(
-                  "static/gameAssets/map.glb",
-                  resolve,
-                  (progress) => console.log(`Loading map.glb: ${progress.loaded}/${progress.total} bytes`),
-                  (error) => {
-                     console.error("Failed to load map.glb:", error);
-                     reject(error);
-                  }
-               );
-            }),
-         ])
-            .then(([roadGltf]) => {
-               console.log("Road model loaded successfully");
-               const roadModel = roadGltf.scene.clone();
+         const mapGltf = await this.gltfLoader.loadAsync("static/gameAssets/map.glb");
+         console.log("Map model loaded successfully");
+         const mapModel = mapGltf.scene.clone();
 
-               roadModel.position.set(0, 0, 0);
-               roadModel.quaternion.set(0, 0, 0, 1);
+         mapModel.position.set(0, 0, 0);
+         mapModel.quaternion.set(0, 0, 0, 1);
 
-               const triangleList = this.createTriangleListFromThreeObject(roadModel);
-               if (!triangleList) {
-                  console.error("Failed to create TriangleList from road model");
-                  this.setState(State.ERROR, "Failed to create physics shape for road");
-                  return;
-               }
+         const triangleList = this.createTriangleListFromThreeObject(mapModel);
+         if (!triangleList) {
+            console.error("Failed to create TriangleList from road model");
+            this.setState(State.ERROR, "Failed to create physics shape for road");
+            return;
+         }
 
-               const roadShapeSettings = new this.Jolt.MeshShapeSettings(triangleList);
+         const mapShapeSettings = new this.Jolt.MeshShapeSettings(triangleList);
 
-               this.tempRVec.Set(0, -16, 0);
-               this.tempQuat.Set(0, 0, 0, 1);
+         this.tempRVec.Set(0, 0, 0);
+         this.tempQuat.Set(0, 0, 0, 1);
 
-               this.createAndAddBody(
-                  roadShapeSettings,
-                  this.tempRVec,
-                  this.tempQuat,
-                  this.Jolt.EMotionType_Static,
-                  LAYER_NON_MOVING,
-                  0x666666,
-                  0,
-                  null,
-                  roadModel
-               );
+         this.createAndAddBody(
+            mapShapeSettings,
+            this.tempRVec,
+            this.tempQuat,
+            this.Jolt.EMotionType_Static,
+            LAYER_NON_MOVING,
+            0x666666,
+            0,
+            null,
+            mapModel
+         );
 
-               this.Jolt.destroy(triangleList);
-               this.Jolt.destroy(roadShapeSettings);
-               console.log("Road model added to scene and physics system with mesh shape");
-            })
-            .catch((error) => {
-               console.error("Failed to load road model:", error);
-               this.setState(State.ERROR, `Failed to load road model: ${error.message}`);
-            });
+         this.Jolt.destroy(triangleList);
+         this.Jolt.destroy(mapShapeSettings);
+
+         this.setState(State.READY)
+         return mapGltf;
       } catch (error) {
-         console.error("Failed to create track:", error);
-         this.setState(State.ERROR, `Track creation error: ${error.message}`);
+         this.setState(State.ERROR, `Map creation error: ${error.message}`);
          throw error;
       }
    }
+
+   async createRoads() {
+      this.setState(State.LOADING);
+      console.log("Creating roads");
+      try {
+         const roadsGltf = await this.gltfLoader.loadAsync("static/gameAssets/roads.glb");
+         console.log("roads model loaded successfully");
+         const roadsModel = roadsGltf.scene.clone();
+
+         roadsModel.position.set(0, 0, 0);
+         roadsModel.quaternion.set(0, 0, 0, 1);
+
+         const triangleList = this.createTriangleListFromThreeObject(roadsModel);
+         if (!triangleList) {
+            console.error("Failed to create TriangleList from roads model");
+            this.setState(State.ERROR, "Failed to create physics shape for roads");
+            return;
+         }
+
+         const roadsShapeSettings = new this.Jolt.MeshShapeSettings(triangleList);
+
+         this.tempRVec.Set(0, 0, 0);
+         this.tempQuat.Set(0, 0, 0, 1);
+
+         this.createAndAddBody(
+            roadsShapeSettings,
+            this.tempRVec,
+            this.tempQuat,
+            this.Jolt.EMotionType_Static,
+            LAYER_NON_MOVING,
+            0x666666,
+            0,
+            null,
+            roadsModel
+         );
+
+         this.Jolt.destroy(triangleList);
+         this.Jolt.destroy(roadsShapeSettings);
+
+         this.setState(State.READY)
+         return roadsGltf;
+      } catch (error) {
+         this.setState(State.ERROR, `Roads creation error: ${error.message}`);
+         throw error;
+      }
+   }
+
+   async createBuildings() {
+      const gltf = await this.gltfLoader.loadAsync("static/gameAssets/buildings.glb");
+      const model = gltf.scene;
+
+      model.position.set(0, 0, 0);
+      model.rotation.set(0, 0, 0);
+      model.scale.set(1, 1, 1);
+      model.updateMatrixWorld(true);
+
+      model.traverse((child) => {
+         if (child.isMesh) {
+            child.castShadow = false;
+            child.receiveShadow = false;
+            child.geometry.computeVertexNormals();
+            child.material.flatShading = false;
+            child.material.needsUpdate = true;
+         }
+      });
+      this.scene.add(model);
+      return { gltf, model };
+   }
+
    createFrictionCurve(multiplier) {
       const curve = new this.Jolt.LinearCurve();
       const basePoints = [
@@ -1399,8 +1446,8 @@ class Game {
    }
 
    // AI:n tekemä: Create a recursive function that creates a pyramid out of cubes with createbody function. Grok 3
-   createPyramid(basePosition, layers = 10, cubeSize = 2.0, currentLayer = 0) {
-      this.tempRVec.Set(30, -10, -30)
+   async createPyramid(basePosition, layers = 10, cubeSize = 2.0, currentLayer = 0) {
+      this.tempRVec.Set(30, 0, -30)
       basePosition = this.tempRVec;
 
       if (currentLayer >= layers) {
@@ -1422,6 +1469,8 @@ class Game {
       texture.magFilter = THREE.NearestFilter;
       let material = new THREE.MeshPhongMaterial({ map: texture, color: 0xbfbfbf });
 
+      let pyramid = [];
+
       // Generate cubes for this layer in a square grid
       for (let x = 0; x < numCubesPerSide; x++) {
          for (let z = 0; z < numCubesPerSide; z++) {
@@ -1438,7 +1487,7 @@ class Game {
             const shapeSettings = new this.Jolt.BoxShapeSettings(halfExtent);
 
             // Add as static body (for a stable pyramid; use Dynamic if interactive)
-            this.createAndAddBody(
+            const box = this.createAndAddBody(
                shapeSettings,
                cubePos,
                cubeQuat,
@@ -1449,6 +1498,7 @@ class Game {
                material
 
             );
+            pyramid.push(box);
 
             // Cleanup resources
             this.Jolt.destroy(shapeSettings);
@@ -1460,9 +1510,11 @@ class Game {
 
       // Recursive call for the next smaller layer
       this.createPyramid(basePosition, layers, cubeSize, currentLayer + 1);
+
+      return pyramid;
    }
 
-   createProps() {
+   async createProps() {
       try {
          const shapeSettings = new this.Jolt.BoxShapeSettings(
             new this.Jolt.Vec3(5, 0.1, 5)
@@ -1482,6 +1534,7 @@ class Game {
          );
 
 
+         return body
       } catch (e) {
          throw e
       }
@@ -1524,9 +1577,6 @@ class Game {
             if (this.ws && this.ws.readyState === WebSocket.OPEN) {
                ++counter
 
-               this.addDebugLog('info', `ws\nplayerId: ${this.playerId}`);
-               this.addDebugLog('info', `ws\npos:\n      x:${this.playerPosition.x}\n      y:${this.playerPosition.y}\n      z:${this.playerPosition.z}`);
-               this.addDebugLog('info', `ws\nvel:\n      x:${this.playerVelocity.x}\n      y:${this.playerVelocity.y}\n      z:${this.playerVelocity.z}`);
                let packet;
                if (isNaN(this.playerId) ||
                   isNaN(this.playerPosition.x) || isNaN(this.playerPosition.y) || isNaN(this.playerPosition.z) ||
@@ -1541,7 +1591,7 @@ class Game {
                   }
 
                   const packetStr = JSON.stringify(packet, null, 2);
-                  this.addDebugLog('info', `CLIENT SENT: packet #${counter}\n${packetStr}`);
+                  //this.addDebugLog('info', `CLIENT SENT: packet #${counter}\n${packetStr}`);
                   try {
                      this.ws.send(packetStr);
                   } catch (e) {
@@ -1576,14 +1626,18 @@ class Game {
          try { await this.initPhysics(); } catch (e) { throw e }
 
 
+         try { await this.createMap(); } catch (e) { throw e }
+         try { await this.createRoads(); } catch (e) { throw e }
+
+         try { await this.createProps(); } catch (e) { throw e }
+
+         try { await this.createPyramid(); } catch (e) { throw e }
+         //try { await this.createBuildings(); } catch (e) { throw e }
          try { this.createVehicle(); } catch (e) { throw e }
          try { this.createGround(); } catch (e) { throw e }
-         try { this.createTrack(); } catch (e) { throw e }
 
 
-         try { this.createPyramid(); } catch (e) { throw e }
 
-         try { this.createProps(); } catch (e) { throw e }
 
 
          // cars spawn position. gltf loading happens async so the other translations messes it up.
