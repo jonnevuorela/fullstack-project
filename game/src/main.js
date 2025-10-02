@@ -65,6 +65,7 @@ class Game {
       // player
       this.controls = null;
       this.playerPosition = null;
+      this.playerRotation = null;
       this.playerVelocity = null;
       this.playerController = null;
       this.keyState = {};
@@ -454,6 +455,7 @@ class Game {
 
 
          this.texLoader = new THREE.TextureLoader();
+         this.scene.fog = new THREE.Fog(0x303b5e, 0, 300);
       } catch (error) {
          console.error("Failed to initialize scene:", error);
          this.setState(State.ERROR, error.message);
@@ -603,7 +605,7 @@ class Game {
       this.setState(State.LOADING);
       console.log("Creating ground");
       try {
-         this.tempRVec.Set(0, -0.1, 0);
+         this.tempRVec.Set(0, -0.3, 0);
          this.tempQuat.Set(0, 0, 0, 1);
 
          const groundShapeSettings = new this.Jolt.BoxShapeSettings(
@@ -1293,10 +1295,17 @@ class Game {
          right = input.rightPressed ? 1.0 : (input.leftPressed ? -1.0 : 0.0);
          const linearV = this.wrapVec3(this.vehicleBody.GetLinearVelocity());
          this.playerVelocity = {
-            x: Math.round(linearV.getComponent(0)),
-            y: Math.round(linearV.getComponent(1)),
-            z: Math.round(linearV.getComponent(2))
+            x: linearV.getComponent(0).toFixed(2),
+            y: linearV.getComponent(1).toFixed(2),
+            z: linearV.getComponent(2).toFixed(2)
          };
+         const vehicleRotation = this.wrapQuat(this.vehicleBody.GetRotation());
+         this.playerRotation = {
+            x: vehicleRotation.x.toFixed(2),
+            y: vehicleRotation.y.toFixed(2),
+            z: vehicleRotation.z.toFixed(2),
+            w: vehicleRotation.w.toFixed(2)
+         }
 
 
          if (this.previousForward * forward < 0.0) {
@@ -1373,9 +1382,9 @@ class Game {
       const vehiclePosition = new THREE.Vector3();
       this.vehicleMesh.getWorldPosition(vehiclePosition);
       this.playerPosition = {
-         x: Math.round(vehiclePosition.getComponent(0)),
-         y: Math.round(vehiclePosition.getComponent(1)),
-         z: Math.round(vehiclePosition.getComponent(2))
+         x: vehiclePosition.getComponent(0).toFixed(2),
+         y: vehiclePosition.getComponent(1).toFixed(2),
+         z: vehiclePosition.getComponent(2).toFixed(2)
       };
 
 
@@ -1578,22 +1587,40 @@ class Game {
                ++counter
 
                let packet;
+
+               let data;
                if (isNaN(this.playerId) ||
                   isNaN(this.playerPosition.x) || isNaN(this.playerPosition.y) || isNaN(this.playerPosition.z) ||
+                  isNaN(this.playerRotation.x) || isNaN(this.playerRotation.y) || isNaN(this.playerRotation.z) || isNaN(this.playerRotation.w) ||
                   isNaN(this.playerVelocity.x) || isNaN(this.playerVelocity.y) || isNaN(this.playerVelocity.z)) {
-
                   packet = null;
                } else {
                   packet = {
-                     playerId: this.playerId,
+                     player_id: Number(this.playerId),
                      position: this.playerPosition,
+                     rotation: this.playerRotation,
                      velocity: this.playerVelocity
                   }
 
+                  data = new Float64Array([
+                     this.playerId,
+                     this.playerPosition.x,
+                     this.playerPosition.y,
+                     this.playerPosition.z,
+                     this.playerRotation.x,
+                     this.playerRotation.y,
+                     this.playerRotation.z,
+                     this.playerRotation.w,
+                     this.playerVelocity.x,
+                     this.playerVelocity.y,
+                     this.playerVelocity.z,
+                  ]);
+
                   const packetStr = JSON.stringify(packet, null, 2);
-                  //this.addDebugLog('info', `CLIENT SENT: packet #${counter}\n${packetStr}`);
+
+                  this.addDebugLog('info', `CLIENT SENT: packet #${counter}\n${packetStr}`);
                   try {
-                     this.ws.send(packetStr);
+                     this.ws.send(data.buffer);
                   } catch (e) {
                      this.addDebugLog('error', `WebSocket send failed: ${e.message}`);
                   }
@@ -1632,7 +1659,7 @@ class Game {
          try { await this.createProps(); } catch (e) { throw e }
 
          try { await this.createPyramid(); } catch (e) { throw e }
-         //try { await this.createBuildings(); } catch (e) { throw e }
+         // try { await this.createBuildings(); } catch (e) { throw e }
          try { this.createVehicle(); } catch (e) { throw e }
          try { this.createGround(); } catch (e) { throw e }
 
