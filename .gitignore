@@ -1,4 +1,8 @@
 game/node_modules
 ui/static/game/*
+
+mariadb-docker/.env
+
 deploy.log
+
 web
