@@ -12,5 +12,9 @@ require (
 
 require (
 	filippo.io/edwards25519 v1.1.0 // indirect
+	github.com/alexedwards/scs/mysqlstore v0.0.0-20251002162104-209de6e426de
+	github.com/go-playground/form/v4 v4.2.1
 	github.com/gorilla/websocket v1.5.3
+	github.com/joho/godotenv v1.5.1
+	golang.org/x/crypto v0.42.0
 )
