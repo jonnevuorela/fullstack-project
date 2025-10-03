@@ -1,8 +1,13 @@
+# dependencies
 game/node_modules
-ui/static/game/*
 
-mariadb-docker/.env
-
+# logs
 deploy.log
 
+# binaries
 web
+ui/static/game/*
+
+# secrets
+mariadb-docker/.env
+.env
