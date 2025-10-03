@@ -10,12 +10,13 @@ import (
 )
 
 type templateData struct {
-	CurrentYear int
-	Form        any
-	Flash       string
-	CSRFToken   string
-	PlayerID    int
-	Nonce       string
+	CurrentYear     int
+	Form            any
+	Flash           string
+	IsAuthenticated bool
+	CSRFToken       string
+	PlayerID        int
+	Nonce           string
 }
 
 var functions = template.FuncMap{
