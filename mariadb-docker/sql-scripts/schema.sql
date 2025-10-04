@@ -8,32 +8,32 @@ SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0;
 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION';
 
 -- -----------------------------------------------------
--- Schema fullstack-project
+-- Schema fullstack_project
 -- -----------------------------------------------------
 
 -- -----------------------------------------------------
--- Schema fullstack-project
+-- Schema fullstack_project
 -- -----------------------------------------------------
-CREATE SCHEMA IF NOT EXISTS `fullstack-project` ;
-USE `fullstack-project` ;
+CREATE SCHEMA IF NOT EXISTS `fullstack_project` ;
+USE `fullstack_project` ;
 
 -- user
 CREATE USER IF NOT EXISTS 'client'@'%' IDENTIFIED BY 'pass';
-GRANT SELECT, INSERT, UPDATE, DELETE ON fullstack-project.* TO 'client'@'%';
+GRANT SELECT, INSERT, UPDATE, DELETE ON `fullstack_project`.* TO 'client'@'%';
 FLUSH PRIVILEGES;
 
 -- sessions
 CREATE TABLE sessions (
    token CHAR(43) PRIMARY KEY,
    data BLOB NOT NULL,
-   expiry TIMESTAMP(6) NOT NULL,
+   expiry TIMESTAMP(6) NOT NULL
 );
 CREATE INDEX sessions_expiry_idx ON sessions (expiry);
 
 -- -----------------------------------------------------
--- Table `fullstack-project`.`tunes`
+-- Table `fullstack_project`.`tunes`
 -- -----------------------------------------------------
-CREATE TABLE IF NOT EXISTS `fullstack-project`.`tunes` (
+CREATE TABLE IF NOT EXISTS `fullstack_project`.`tunes` (
   `id` INT UNIQUE NOT NULL AUTO_INCREMENT,
   `wheel_radius` FLOAT UNSIGNED NOT NULL DEFAULT 0.55,
   `wheel_width` FLOAT UNSIGNED NOT NULL DEFAULT 0.6,
@@ -66,9 +66,9 @@ ENGINE = InnoDB;
 
 
 -- -----------------------------------------------------
--- Table `fullstack-project`.`users`
+-- Table `fullstack_project`.`users`
 -- -----------------------------------------------------
-CREATE TABLE IF NOT EXISTS `fullstack-project`.`users` (
+CREATE TABLE IF NOT EXISTS `fullstack_project`.`users` (
   `id` INT UNIQUE NOT NULL AUTO_INCREMENT,
   `username` VARCHAR(16) NOT NULL,
   `email` VARCHAR(255) NULL,
@@ -90,9 +90,9 @@ DEFAULT CHARACTER SET = utf8;
 
 
 -- -----------------------------------------------------
--- Table `fullstack-project`.`players`
+-- Table `fullstack_project`.`players`
 -- -----------------------------------------------------
-CREATE TABLE IF NOT EXISTS `fullstack-project`.`players` (
+CREATE TABLE IF NOT EXISTS `fullstack_project`.`players` (
   `user_id` INT UNIQUE NOT NULL,
   `player_name` VARCHAR(16) CHARACTER SET 'binary' NULL,
   `position_x` FLOAT NOT NULL DEFAULT 0,
