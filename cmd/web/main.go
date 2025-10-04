@@ -34,7 +34,12 @@ type application struct {
 func main() {
 	addr := flag.String("addr", "0.0.0.0:4000", "HTTP network address")
 
-	dbInfo := fmt.Sprintf("%v:%v@/%v?parseTime=true", getEnvVar("DB_USER"), getEnvVar("DB_PASS"), getEnvVar("DB_NAME"))
+	dbInfo := fmt.Sprintf("%v:%v@tcp(127.0.0.1:%v)/%v?parseTime=true",
+		getEnvVar("DB_USER"),
+		getEnvVar("DB_PASS"),
+		getEnvVar("DB_PORT"),
+		getEnvVar("DB_NAME"))
+
 	dsn := flag.String("dsn", dbInfo, "MySQL data source name")
 
 	flag.Parse()
