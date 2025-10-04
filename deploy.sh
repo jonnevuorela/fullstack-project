@@ -27,3 +27,12 @@ echo "[$(date)] Restarting systemd service..."
 sudo systemctl restart game-jonnevuorela-web.service
 
 echo "===== Deployment completed successfully at $(date) ====="
+
+
+echo "===== Restarting database container $(date) ====="
+
+cd /home/jonne/fullstack-project/mariadb-docker
+docker-compose down
+docker-compose up -d
+
+echo "===== Database container restarted successfully at $(date) ====="
