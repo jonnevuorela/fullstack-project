@@ -1,2 +1,2 @@
 ### Database diagram
-![diagram](mariadb-docker/diagram.svg)
+![diagram](diagram.svg)
