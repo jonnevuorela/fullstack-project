@@ -1,0 +1,3 @@
+CREATE USER IF NOT EXISTS 'client'@'%' IDENTIFIED BY 'pass';
+GRANT SELECT, INSERT, UPDATE, DELETE ON `fullstack_project`.* TO 'client'@'%';
+FLUSH PRIVILEGES;
