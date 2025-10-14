@@ -15,9 +15,32 @@ func noSurf(next http.Handler) http.Handler {
 	csrfHandler.SetBaseCookie(http.Cookie{
 		HttpOnly: true,
 		Path:     "/",
-		Secure:   false,
+		Secure:   true,
 	})
 	return csrfHandler
+}
+
+func (app *application) authenticate(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		id := app.sessionManager.GetInt(r.Context(), "authenticatedUserId")
+		if id == 0 {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		exists, err := app.users.Exists(id)
+		if err != nil {
+			app.serverError(w, err)
+			return
+		}
+
+		if exists {
+			ctx := context.WithValue(r.Context(), isAuthenticatedContextKey, true)
+			r = r.WithContext(ctx)
+		}
+
+		next.ServeHTTP(w, r)
+	})
 }
 
 func (app *application) requireAuthentication(next http.Handler) http.Handler {
@@ -48,9 +71,9 @@ func secureHeaders(next http.Handler) http.Handler {
 			"Content-Security-Policy",
 			"default-src 'self'; "+
 				"script-src 'self' 'nonce-"+nonce+"' 'wasm-unsafe-eval'; "+
-				"style-src 'self' https://fonts.googleapis.com; "+
+				"style-src 'self' https://fonts.googleapis.com 'unsafe-inline'; "+
 				"font-src https://fonts.gstatic.com; "+
-				"connect-src 'self' ws://localhost:4000 blob:; "+
+				"connect-src 'self' wss://localhost:4000 blob:; "+
 				"object-src 'none'; "+
 				"base-uri 'self'; "+
 				"frame-src 'none'; "+
@@ -58,8 +81,6 @@ func secureHeaders(next http.Handler) http.Handler {
 				"media-src 'none'",
 		)
 
-		w.Header().Set("Cross-Origin-Opener-Policy", "same-origin")
-		w.Header().Set("Cross-Origin-Embedder-Policy", "require-corp")
 		w.Header().Set("Referrer-Policy", "origin-when-cross-origin")
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("X-Frame-Options", "deny")

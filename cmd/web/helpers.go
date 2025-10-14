@@ -85,6 +85,6 @@ func (app *application) newTemplateData(r *http.Request) *templateData {
 		PlayerID:    123, // placeholder
 		Nonce:       nonce,
 
-		//IsAuthenticated: app.isAuthenticated(r),
+		IsAuthenticated: app.isAuthenticated(r),
 	}
 }

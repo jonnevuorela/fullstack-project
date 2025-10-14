@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/binary"
 	"errors"
+	"fmt"
 
 	"math"
 	"net/http"
@@ -106,6 +107,7 @@ func (app *application) userSignupPost(writer http.ResponseWriter, request *http
 		app.clientError(writer, http.StatusBadRequest)
 		return
 	}
+
 	form.CheckField(validator.NotBlank(form.Username), "username", "This field cannot be blank")
 	if validator.NotBlank(form.Email) {
 		form.CheckField(validator.Matches(form.Email, validator.EmailRX), "email", "This field must be a valid email address")
@@ -129,6 +131,7 @@ func (app *application) userSignupPost(writer http.ResponseWriter, request *http
 			app.render(writer, http.StatusUnprocessableEntity, "signup.tmpl", data)
 		} else {
 			app.serverError(writer, err)
+			app.sessionManager.Put(request.Context(), "flash", fmt.Sprintf("Error in signup %v", err))
 		}
 		return
 	}
@@ -136,6 +139,7 @@ func (app *application) userSignupPost(writer http.ResponseWriter, request *http
 	app.sessionManager.Put(request.Context(), "flash", "Your signup was successful. Plese log in.")
 
 	http.Redirect(writer, request, "/user/login", http.StatusSeeOther)
+
 }
 
 func (app *application) userLogin(writer http.ResponseWriter, request *http.Request) {
@@ -185,7 +189,7 @@ func (app *application) userLoginPost(writer http.ResponseWriter, request *http.
 
 	app.sessionManager.Put(request.Context(), "authenticatedUserId", id)
 
-	http.Redirect(writer, request, "/home", http.StatusSeeOther)
+	http.Redirect(writer, request, "/", http.StatusSeeOther)
 }
 
 func (app *application) userLogoutPost(writer http.ResponseWriter, request *http.Request) {

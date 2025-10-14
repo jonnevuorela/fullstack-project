@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/tls"
 	"database/sql"
 	"flag"
 	"fmt"
@@ -32,20 +33,25 @@ type application struct {
 }
 
 func main() {
+	infoLog := log.New(os.Stdout, "\033[42;30mINFO\033[0m\t", log.Ldate|log.Ltime)
+	errorLog := log.New(os.Stderr, "\033[41;30mERROR\033[0m\t", log.Ldate|log.Ltime|log.Lshortfile)
+
 	addr := flag.String("addr", "0.0.0.0:4000", "HTTP network address")
 
+	err := godotenv.Load(".env")
+	if err != nil {
+		errorLog.Fatal(err)
+	}
+
 	dbInfo := fmt.Sprintf("%v:%v@tcp(127.0.0.1:%v)/%v?parseTime=true",
-		getEnvVar("DB_USER"),
-		getEnvVar("DB_PASS"),
-		getEnvVar("DB_PORT"),
-		getEnvVar("DB_NAME"))
+		os.Getenv("DB_USER"),
+		os.Getenv("DB_PASS"),
+		os.Getenv("DB_PORT"),
+		os.Getenv("DB_NAME"))
 
 	dsn := flag.String("dsn", dbInfo, "MySQL data source name")
 
 	flag.Parse()
-
-	infoLog := log.New(os.Stdout, "\033[42;30mINFO\033[0m\t", log.Ldate|log.Ltime)
-	errorLog := log.New(os.Stderr, "\033[41;30mERROR\033[0m\t", log.Ldate|log.Ltime|log.Lshortfile)
 
 	templateCache, err := newTemplateCache()
 	if err != nil {
@@ -74,26 +80,33 @@ func main() {
 
 	sessionManager.Cookie.Secure = true
 
+	tlsConfig := &tls.Config{
+		CurvePreferences: []tls.CurveID{tls.X25519, tls.CurveP256},
+	}
+
 	app := &application{
 		errorLog:       errorLog,
 		infoLog:        infoLog,
 		templateCache:  templateCache,
 		sessionManager: sessionManager,
 		formDecoder:    formDecoder,
+		upgrader:       upgrader,
 
-		upgrader: upgrader,
+		users:   &models.UserModel{DB: db},
+		players: &models.PlayerModel{DB: db},
 	}
 
 	srv := &http.Server{
 		Addr:         *addr,
 		Handler:      app.routes(),
+		TLSConfig:    tlsConfig,
 		IdleTimeout:  time.Minute,
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 10 * time.Second,
 	}
 
-	infoLog.Printf("Starting server on http://%s", *addr)
-	err = srv.ListenAndServe()
+	infoLog.Printf("Starting server on https://%s", *addr)
+	err = srv.ListenAndServeTLS("./tls/cert.pem", "./tls/key.pem")
 	errorLog.Fatal(err)
 }
 
@@ -106,13 +119,4 @@ func openDB(dsn string) (*sql.DB, error) {
 		return nil, err
 	}
 	return db, nil
-}
-
-func getEnvVar(key string) string {
-	err := godotenv.Load(".env")
-
-	if err != nil {
-		log.Fatal(err)
-	}
-	return os.Getenv(key)
 }
