@@ -11,3 +11,4 @@ ui/static/game/*
 # secrets
 mariadb-docker/.env
 .env
+tls
