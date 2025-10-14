@@ -128,12 +128,12 @@ form input[type="radio"] {
     margin-left: 18px;
 }
 
-form input[type="text"], form input[type="password"], form input[type="email"] {
+form input[type="username"], form input[type="password"], form input[type="email"] {
     padding: 0.75em 18px;
     width: 100%;
 }
 
-form input[type=text], form input[type="password"], form input[type="email"], textarea {
+form input[type="username"], form input[type="password"], form input[type="email"], textarea {
     color: #003049;
     background: #FFFFFF;
     border: 1px solid #E4E5E7;
