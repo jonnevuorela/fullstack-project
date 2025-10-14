@@ -31,10 +31,10 @@ func (app *application) routes() http.Handler {
 		fileServer.ServeHTTP(w, r)
 	}))
 	router.HandlerFunc(http.MethodGet, "/ping", ping)
-	router.HandlerFunc(http.MethodGet, "/ws", app.websocket)
 
-	dynamic := alice.New(app.sessionManager.LoadAndSave, noSurf)
+	dynamic := alice.New(app.sessionManager.LoadAndSave, noSurf, app.authenticate)
 
+	router.Handler(http.MethodGet, "/ws", dynamic.ThenFunc(app.websocket))
 	router.Handler(http.MethodGet, "/", dynamic.ThenFunc(app.home))
 	router.Handler(http.MethodGet, "/game", dynamic.ThenFunc(app.game))
 	router.Handler(http.MethodGet, "/user/signup", dynamic.ThenFunc(app.userSignup))
