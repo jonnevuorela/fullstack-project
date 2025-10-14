@@ -1552,7 +1552,7 @@ class Game {
    websocketConnect() {
       //  this.setState(State.LOADING);
       this.setNetworkState(NetworkState.CONNECTING);
-      this.ws = new WebSocket('ws://localhost:4000/ws');
+      this.ws = new WebSocket('wss://localhost:4000/ws');
       if (!this.ws) {
          throw new Error("WebSocket creation failed");
       }
