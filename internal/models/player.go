@@ -1,21 +1,15 @@
 package models
 
-import "database/sql"
+import (
+	"database/sql"
+	"errors"
+
+	"github.com/go-sql-driver/mysql"
+)
 
 type Player struct {
-	PlayerId   int
-	Name       string
-	ActiveTune Tune
-	PositionX  float64
-	PositionY  float64
-	PositionZ  float64
-	RotationX  float64
-	RotationY  float64
-	RotationZ  float64
-	RotationW  float64
-	VelocityX  float64
-	VelocityY  float64
-	VelocityZ  float64
+	UserId int
+	Name   string
 }
 
 type PlayerModel struct {
@@ -24,24 +18,39 @@ type PlayerModel struct {
 
 type PlayerModelIntarface interface {
 	Insert(player Player) error
-	Get(id int) (*Player, error)
-	UpdateLocation(player Player) error
+	GetByUser(user User) (*Player, error)
+}
+
+func (p *PlayerModel) GetByUser(user User) (*Player, error) {
+	player := NewPlayer(user)
+	stmt := "SELECT * FROM players WHERE user_id = ?"
+	err := p.DB.QueryRow(stmt, player.UserId).Scan(
+		&player.UserId,
+		&player.Name,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return &player, err
+}
+
+func (p *PlayerModel) Insert(player Player) error {
+	stmt := `INSERT INTO players (user_id, player_name) VALUES(?, ?)`
+	_, err := p.DB.Exec(stmt,
+		player.UserId, player.Name,
+	)
+	if err != nil {
+		var mySQLError *mysql.MySQLError
+		if errors.As(err, &mySQLError) {
+			return mySQLError
+		}
+	}
+	return nil
 }
 
 func NewPlayer(user User) Player {
 	return Player{
-		PlayerId:   int(user.Id),
-		Name:       user.Username,
-		ActiveTune: user.SavedTune,
-		PositionX:  user.LastLocation[0],
-		PositionY:  user.LastLocation[1],
-		PositionZ:  user.LastLocation[2],
-		RotationX:  user.LastLocation[3],
-		RotationY:  user.LastLocation[4],
-		RotationZ:  user.LastLocation[5],
-		RotationW:  user.LastLocation[6],
-		VelocityX:  0,
-		VelocityY:  0,
-		VelocityZ:  0,
+		UserId: int(user.Id),
+		Name:   user.Username,
 	}
 }

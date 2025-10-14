@@ -3,6 +3,7 @@ package models
 import (
 	"database/sql"
 	"errors"
+	"log"
 	"strings"
 	"time"
 
@@ -17,8 +18,8 @@ type User struct {
 	HashedPassword []byte
 	CreateTime     time.Time
 
-	SavedTune    Tune
-	LastLocation [7]float64 // Vec3 position + Vec4 rotation
+	SavedTune     int
+	SavedLocation int
 }
 
 type UserModel struct {
@@ -28,9 +29,10 @@ type UserModelInterface interface {
 	Insert(username string, email string, password string) error
 	Authenticate(username string, password string) (int, error)
 	Exists(id int) (bool, error)
+	Get(id int) (*User, error)
 }
 
-func (m *UserModel) Authenticate(email, password string) (int, error) {
+func (m *UserModel) Authenticate(email string, password string) (int, error) {
 	var id int
 	var hashedPassword []byte
 
@@ -58,34 +60,50 @@ func (m *UserModel) Authenticate(email, password string) (int, error) {
 }
 
 func (m *UserModel) Insert(username string, email string, password string) error {
-
+	println("============ User model Insert ============")
+	println("username", username)
+	if email != "" {
+		println("email", email)
+	}
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), 12)
 	if err != nil {
 		return err
 	}
+	println("password hash", hashedPassword)
 
-	tune := NewTune()
-	location := [7]float64{0, 0, 0, 0, 0, 0, 1}
-
+	var result sql.Result
+	println(email)
 	if email != "" {
-		stmt := `INSERT INTO users (username, email, hashed_password, create_time, last_location, saved_tune)
-   VALUES(?, ?, ?, UTC_TIMESTAMP(),?, ?)`
-		_, err = m.DB.Exec(stmt, username, email, string(hashedPassword), location, tune)
+		stmt := `INSERT INTO users (username, email, hashed_password, create_time)
+   VALUES(?, ?, ?, UTC_TIMESTAMP())`
+		result, err = m.DB.Exec(stmt, username, email, string(hashedPassword))
 	} else {
-		stmt := `INSERT INTO users (username, hashed_password, create_time, last_location, saved_tune)
-   VALUES(?, ?, UTC_TIMESTAMP(),?, ?)`
-		_, err = m.DB.Exec(stmt, username, string(hashedPassword), location, tune)
+		stmt := `INSERT INTO users (username, hashed_password, create_time)
+   VALUES(?, ?, UTC_TIMESTAMP())`
+		result, err = m.DB.Exec(stmt, username, string(hashedPassword))
 	}
-
 	if err != nil {
+		log.Println("Exec error:", err)
 		var mySQLError *mysql.MySQLError
 		if errors.As(err, &mySQLError) {
 			if mySQLError.Number == 1062 && strings.Contains(mySQLError.Message, "users_uc_username") {
+				println(mySQLError)
 				return ErrDuplicateUsername
 			}
+		} else {
+			println(err)
+			return err
 		}
-		return nil
+
+		return err
 	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		log.Println("RowsAffected err:", err)
+	}
+	log.Println("Rows affected:", rows)
+
+	println("================== ok ======================")
 	return nil
 }
 
@@ -96,4 +114,24 @@ func (m *UserModel) Exists(id int) (bool, error) {
 
 	err := m.DB.QueryRow(stmt, id).Scan(&exists)
 	return exists, err
+}
+
+func (m *UserModel) Get(id int) (*User, error) {
+	user := User{}
+	stmt := "SELECT * FROM users WHERE id = ?"
+	err := m.DB.QueryRow(stmt, id).Scan(
+		&user.Id,
+		&user.Username,
+		&user.Email,
+		&user.HashedPassword,
+		&user.CreateTime,
+		&user.SavedTune,
+		&user.SavedLocation,
+	)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &user, err
 }

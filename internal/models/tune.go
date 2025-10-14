@@ -1,5 +1,12 @@
 package models
 
+import (
+	"database/sql"
+	"errors"
+
+	"github.com/go-sql-driver/mysql"
+)
+
 type Tune struct {
 	WheelRadius                  float64
 	WheelWidth                   float64
@@ -10,6 +17,7 @@ type Tune struct {
 	SuspensionLenghtMin          float64
 	SuspensionLenghtMax          float64
 	SuspensionPreload            float64
+	SuspensionDamping            float64
 	SuspensionStiffeness         float64
 	FrontTyreLateralFriction     float64
 	FrontTyreLongitudalFriction  float64
@@ -27,6 +35,174 @@ type Tune struct {
 	FlywheelMass                 float64
 	VehicleMass                  float64
 }
+type TuneModel struct {
+	DB *sql.DB
+}
+
+type TuneModelIntarface interface {
+	Insert(tune Tune) error
+	Get(id int) (*Tune, error)
+	UpdateDBWithTune(int, Tune) error
+}
+
+func (t *TuneModel) UpdateDBWithTune(id int, tune Tune) error {
+	stmt := `UPDATE tunes 
+				SET 				
+					wheel_radius = ?,
+					wheel_width = ?,
+					wheel_offset = ? ,
+					wheel_vertical_offset = ? ,
+					wheel_longitudal_offset = ?,
+					max_steering_angle = ?,
+					suspension_lenght_min = ?,
+					suspension_lenght_max = ?,
+					suspension_preload = ?,
+					suspension_damping = ?,
+					suspension_stiffness = ?,
+					front_tyre_lateral_friction = ?,
+					front_tyre_longitudal_friction = ?,
+					rear_tyre_lateral_friction = ?,
+					rear_tyre_longitudal_friction = ?,
+					four_wheel_drive = ?,
+					antirollbar = ?,
+					torque_split_ratio = ?,
+					differential_limited_slip_ratio = ?,
+					max_engine_torque = ?,
+					clutch_strenght,
+					min_rpm,
+					max_rpm,
+					damper_mass,
+					flywheel_mass,
+					vehicle_mass
+				WHERE id = ?`
+
+	_, err := t.DB.Exec(stmt,
+		id,
+	)
+	if err != nil {
+		var mySQLError *mysql.MySQLError
+		if errors.As(err, &mySQLError) {
+			return mySQLError
+		} else {
+			return err
+		}
+	}
+	return nil
+}
+func (t *TuneModel) Get(id int) (*Tune, error) {
+	tune := NewTune()
+	stmt := "SELECT * FROM tunes WHERE id = ?"
+	err := t.DB.QueryRow(stmt, id).Scan(
+		&tune.WheelRadius,
+		&tune.WheelWidth,
+		&tune.WheelOffset,
+		&tune.WheelVerticalOffset,
+		&tune.WheelLongitudalOffset,
+		&tune.MaxSteeringAngle,
+		&tune.SuspensionLenghtMin,
+		&tune.SuspensionLenghtMax,
+		&tune.SuspensionPreload,
+		&tune.SuspensionDamping,
+		&tune.SuspensionStiffeness,
+		&tune.FrontTyreLateralFriction,
+		&tune.FrontTyreLongitudalFriction,
+		&tune.RearTyreLateralFriction,
+		&tune.RearTyreLongitudalFriction,
+		&tune.FourWheelDrive,
+		&tune.Antirollbar,
+		&tune.TorqueSplitRatio,
+		&tune.DifferentialLimitedSlipRatio,
+		&tune.MaxEngineTorque,
+		&tune.ClutchStrenght,
+		&tune.MinRpm,
+		&tune.MaxRpm,
+		&tune.DamperMass,
+		&tune.FlywheelMass,
+		&tune.VehicleMass)
+	if err != nil {
+		var mySQLError *mysql.MySQLError
+		if errors.As(err, &mySQLError) {
+			return nil, mySQLError
+		} else {
+			return nil, err
+		}
+	}
+	return &tune, nil
+}
+
+func (t *TuneModel) Insert(tune Tune) (*int, error) {
+	stmt := `INSERT INTO tunes(
+	wheel_radius,
+	wheel_width,
+	wheel_offset,
+	wheel_vertical_offset,
+	wheel_longitudal_offset,
+	max_steering_angle,
+	suspension_lenght_min,
+	suspension_lenght_max,
+	suspension_preload,
+	suspension_damping,
+	suspension_stiffness,
+	front_tyre_lateral_friction,
+	front_tyre_longitudal_friction,
+	rear_tyre_lateral_friction,
+	rear_tyre_longitudal_friction,
+	four_wheel_drive,
+	antirollbar,
+	torque_split_ratio,
+	differential_limited_slip_ratio,
+	max_engine_torque,
+	clutch_strenght,
+	min_rpm,
+	max_rpm,
+	damper_mass,
+	flywheel_mass,
+	vehicle_mass
+		)
+		VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
+
+	result, err := t.DB.Exec(stmt,
+		tune.WheelRadius,
+		tune.WheelWidth,
+		tune.WheelOffset,
+		tune.WheelVerticalOffset,
+		tune.WheelLongitudalOffset,
+		tune.MaxSteeringAngle,
+		tune.SuspensionLenghtMin,
+		tune.SuspensionLenghtMax,
+		tune.SuspensionPreload,
+		tune.SuspensionDamping,
+		tune.SuspensionStiffeness,
+		tune.FrontTyreLateralFriction,
+		tune.FrontTyreLongitudalFriction,
+		tune.RearTyreLateralFriction,
+		tune.RearTyreLongitudalFriction,
+		tune.FourWheelDrive,
+		tune.Antirollbar,
+		tune.TorqueSplitRatio,
+		tune.DifferentialLimitedSlipRatio,
+		tune.MaxEngineTorque,
+		tune.ClutchStrenght,
+		tune.MinRpm,
+		tune.MaxRpm,
+		tune.DamperMass,
+		tune.FlywheelMass,
+		tune.VehicleMass)
+
+	if err != nil {
+		var mySQLError *mysql.MySQLError
+		if errors.As(err, &mySQLError) {
+			return nil, mySQLError
+		}
+	}
+
+	insertedID, err := result.LastInsertId()
+	if err != nil {
+		return nil, err
+	}
+	id := int(insertedID)
+	return &id, nil
+}
 
 func NewTune() Tune {
 	return Tune{
@@ -39,6 +215,7 @@ func NewTune() Tune {
 		SuspensionLenghtMin:          0.4,
 		SuspensionLenghtMax:          1,
 		SuspensionPreload:            1,
+		SuspensionDamping:            1,
 		SuspensionStiffeness:         1,
 		FrontTyreLateralFriction:     1,
 		FrontTyreLongitudalFriction:  1,
