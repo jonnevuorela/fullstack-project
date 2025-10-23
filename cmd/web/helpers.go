@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"math/rand/v2"
 	"net/http"
 	"runtime/debug"
 	"time"
@@ -19,7 +20,6 @@ func (app *application) isAuthenticated(request *http.Request) bool {
 	}
 	return isAuthenticated
 }
-
 func (app *application) serverError(w http.ResponseWriter, err error) {
 	trace := fmt.Sprintf("%s\n%s", err.Error(), debug.Stack())
 	app.errorLog.Output(2, trace)
@@ -78,11 +78,52 @@ func (app *application) decodePostForm(r *http.Request, dst any) error {
 
 func (app *application) newTemplateData(r *http.Request) *templateData {
 	nonce, _ := r.Context().Value("nonce").(string)
+	id := app.sessionManager.Get(r.Context(), "authenticatedUserId")
+	var resolvedId int
+
+	// varmennetaan id:n tyyppi ja generoidaan vieras id jos käyttäjä ei ole kirjautunut
+	if id == nil {
+		guestId := app.sessionManager.Get(r.Context(), "guestUserId")
+		if  guestId == nil{
+			valid_id := false
+			var num int
+			for !valid_id{
+				num = rand.Int()
+				duplicate, err := app.users.Exists(num)
+				if err != nil{
+					app.errorLog.Print(err)
+					continue
+				}
+				if !duplicate && num != 0 {
+					valid_id = true
+				}
+			}
+			resolvedId = num
+			app.infoLog.Printf("Random guest id generated: %v", resolvedId)
+			app.sessionManager.Put(r.Context(), "guestUserId", resolvedId)
+		}else{
+			if gId, ok := guestId.(int); ok{
+				resolvedId = gId
+			}else {
+				app.errorLog.Printf("Invalid guest id type: %T", guestId)
+				resolvedId = 0
+			}
+		}
+    }else {
+		if authId, ok := id.(int); ok {
+			resolvedId = authId
+		}else{
+			app.errorLog.Printf("Invalid authenticated id type: %T", authId)
+			resolvedId = 0
+		}
+	}
+	app.infoLog.Printf("userId: %v", resolvedId)
+
 	return &templateData{
 		CurrentYear: time.Now().Year(),
 		Flash:       app.sessionManager.PopString(r.Context(), "flash"),
 		CSRFToken:   nosurf.Token(r),
-		PlayerID:    123, // placeholder
+		PlayerID:    resolvedId,
 		Nonce:       nonce,
 
 		IsAuthenticated: app.isAuthenticated(r),
