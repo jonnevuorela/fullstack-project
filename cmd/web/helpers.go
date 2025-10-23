@@ -84,13 +84,13 @@ func (app *application) newTemplateData(r *http.Request) *templateData {
 	// varmennetaan id:n tyyppi ja generoidaan vieras id jos käyttäjä ei ole kirjautunut
 	if id == nil {
 		guestId := app.sessionManager.Get(r.Context(), "guestUserId")
-		if  guestId == nil{
+		if guestId == nil {
 			valid_id := false
 			var num int
-			for !valid_id{
+			for !valid_id {
 				num = rand.Int()
 				duplicate, err := app.users.Exists(num)
-				if err != nil{
+				if err != nil {
 					app.errorLog.Print(err)
 					continue
 				}
@@ -101,18 +101,18 @@ func (app *application) newTemplateData(r *http.Request) *templateData {
 			resolvedId = num
 			app.infoLog.Printf("Random guest id generated: %v", resolvedId)
 			app.sessionManager.Put(r.Context(), "guestUserId", resolvedId)
-		}else{
-			if gId, ok := guestId.(int); ok{
+		} else {
+			if gId, ok := guestId.(int); ok {
 				resolvedId = gId
-			}else {
+			} else {
 				app.errorLog.Printf("Invalid guest id type: %T", guestId)
 				resolvedId = 0
 			}
 		}
-    }else {
+	} else {
 		if authId, ok := id.(int); ok {
 			resolvedId = authId
-		}else{
+		} else {
 			app.errorLog.Printf("Invalid authenticated id type: %T", authId)
 			resolvedId = 0
 		}

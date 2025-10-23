@@ -10,6 +10,7 @@ import (
 
 	"fullstack-project.jonnevuorela.com/internal/models"
 	"fullstack-project.jonnevuorela.com/internal/validator"
+	"github.com/anandvarma/namegen"
 )
 
 type userSignupForm struct {
@@ -26,6 +27,75 @@ type userLoginForm struct {
 }
 
 func (app *application) websocket(w http.ResponseWriter, r *http.Request) {
+	gId := app.sessionManager.Get(r.Context(), "guestUserId")
+	aId := app.sessionManager.Get(r.Context(), "authenticatedUserId")
+	app.infoLog.Printf("\nguest id: %v \nuser id: %v", gId, aId)
+	var player *models.Player
+
+	if aId != nil {
+		// Kirjautunut käyttäjä
+		app.infoLog.Print("Handling authenticated user")
+		if authId, ok := aId.(int); ok {
+			exists, err := app.users.Exists(authId)
+			if err != nil {
+				app.errorLog.Printf("Error checking user existence: %v", err)
+				return
+			}
+
+			if exists {
+				user, err := app.users.Get(authId)
+				if err != nil {
+					app.errorLog.Printf("Error getting user: %v", err)
+					return
+				}
+
+				player, err = app.players.GetByUser(*user)
+				if err != nil {
+					// Luodaan pelaaja käyttäjälle, jos ei löydy tietokannasta
+					newPlayer := models.Player{
+						UserId: int(user.Id),
+						Name:   user.Username,
+					}
+					err = app.players.Insert(newPlayer)
+					if err != nil {
+						app.errorLog.Printf("Error inserting player: %v", err)
+						return
+					}
+					player = &newPlayer
+				}
+			}
+		} else {
+			app.errorLog.Printf("Invalid authenticated user ID type: %T", aId)
+			return
+		}
+	} else if gId != nil {
+		// Vieraskäyttäjä
+		app.infoLog.Print("Handling guest user")
+		if guestId, ok := gId.(int); ok {
+			guestPlayer := models.Player{
+				UserId: guestId,
+				Name:   namegen.New().Get(),
+			}
+			err := app.players.Insert(guestPlayer)
+			if err != nil {
+				app.errorLog.Printf("Error inserting guest player: %v", err)
+				return
+			}
+			player = &guestPlayer
+		} else {
+			app.errorLog.Printf("Invalid guest ID type: %T", gId)
+			return
+		}
+	} else {
+		app.errorLog.Print("No valid user ID found")
+		return
+	}
+
+	if player == nil {
+		app.errorLog.Print("Failed to create/retrieve player")
+		return
+	}
+
 	conn, err := app.upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		app.infoLog.Printf("WebSocket upgrade error: %v", err)
@@ -34,6 +104,8 @@ func (app *application) websocket(w http.ResponseWriter, r *http.Request) {
 	defer conn.Close()
 
 	app.infoLog.Printf("WebSocket connected: %v", conn.LocalAddr().String())
+
+	app.infoLog.Printf("Player %v connected by websocket with id %v", player.Name, player.UserId)
 
 	for {
 		_, data, err := conn.ReadMessage()

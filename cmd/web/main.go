@@ -79,6 +79,8 @@ func main() {
 	sessionManager.Lifetime = 12 * time.Hour
 
 	sessionManager.Cookie.Secure = true
+	sessionManager.Cookie.SameSite = http.SameSiteNoneMode
+	sessionManager.Cookie.HttpOnly = true
 
 	tlsConfig := &tls.Config{
 		CurvePreferences: []tls.CurveID{tls.X25519, tls.CurveP256},

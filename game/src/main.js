@@ -69,7 +69,7 @@ class Game {
       this.playerVelocity = null;
       this.playerController = null;
       this.keyState = {};
-      this.playerId = window.playerId || 123;
+      this.playerId = window.playerId;
 
       // vehicle physics and rendering
       this.vehicle = null;
@@ -923,7 +923,7 @@ class Game {
       const maxEngineTorque = 2500.0;
       const clutchStrength = 1000.0;
       const minRPM = 400;
-      const maxRPM = 10000;
+      const maxRPM = 8000;
       const damperMass = 1.0;
       const flywheelMass = 1.0;
 

@@ -3,6 +3,10 @@
     <div class="game-container">
         <div id="gameCanvas"/></div>
     </div>
-    <script nonce="{{.Nonce}}">const playerId = "{{.PlayerID}}";</script>
+    <script nonce="{{.Nonce}}">
+    window.playerId = {{.PlayerID}};
+    console.log("Template PlayerID:", window.playerId, typeof window.playerId);
+    </script>
     <script type="module" nonce="{{.Nonce}}" src="/static/game/game.bundle.js"></script>
 {{end}}
+
