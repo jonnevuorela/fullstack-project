@@ -37,6 +37,7 @@ func main() {
 	errorLog := log.New(os.Stderr, "\033[41;30mERROR\033[0m\t", log.Ldate|log.Ltime|log.Lshortfile)
 
 	addr := flag.String("addr", "0.0.0.0:4000", "HTTP network address")
+	devMode := flag.Bool("dev", false, "Development mode")
 
 	err := godotenv.Load(".env")
 	if err != nil {
@@ -56,6 +57,16 @@ func main() {
 	templateCache, err := newTemplateCache()
 	if err != nil {
 		errorLog.Fatal(err)
+	}
+	if *devMode {
+		infoLog.Println("Running in development mode")
+		templateCache = nil
+	} else {
+		var err error
+		templateCache, err = newTemplateCache()
+		if err != nil {
+			errorLog.Fatal(err)
+		}
 	}
 
 	var upgrader = websocket.Upgrader{
