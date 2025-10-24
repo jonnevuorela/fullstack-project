@@ -118,11 +118,12 @@ func (m *UserModel) Exists(id int) (bool, error) {
 
 func (m *UserModel) Get(id int) (*User, error) {
 	user := User{}
+	var email sql.NullString
 	stmt := "SELECT * FROM users WHERE id = ?"
 	err := m.DB.QueryRow(stmt, id).Scan(
 		&user.Id,
 		&user.Username,
-		&user.Email,
+		&email,
 		&user.HashedPassword,
 		&user.CreateTime,
 		&user.SavedTune,
@@ -131,6 +132,11 @@ func (m *UserModel) Get(id int) (*User, error) {
 
 	if err != nil {
 		return nil, err
+	}
+	if email.Valid {
+		user.Email = email.String
+	} else {
+		user.Email = ""
 	}
 
 	return &user, err
