@@ -82,13 +82,15 @@ func (app *application) newTemplateData(r *http.Request) *templateData {
 	var resolvedId int
 
 	// varmennetaan id:n tyyppi ja generoidaan vieras id jos käyttäjä ei ole kirjautunut
-	if id == nil {
+	if id == nil || id == 0 {
 		guestId := app.sessionManager.Get(r.Context(), "guestUserId")
-		if guestId == nil {
+
+		if guestId == nil || guestId == 0 {
 			valid_id := false
 			var num int
 			for !valid_id {
-				num = rand.Int()
+				// guest id:t on rangella miljardi - max uint32
+				num = int(rand.Uint32N(4294967295-1000000000) + 1000000000)
 				duplicate, err := app.users.Exists(num)
 				if err != nil {
 					app.errorLog.Print(err)
@@ -102,6 +104,8 @@ func (app *application) newTemplateData(r *http.Request) *templateData {
 			app.infoLog.Printf("Random guest id generated: %v", resolvedId)
 			app.sessionManager.Put(r.Context(), "guestUserId", resolvedId)
 		} else {
+
+			app.infoLog.Printf("guest id found in request, not generating new: %v", guestId)
 			if gId, ok := guestId.(int); ok {
 				resolvedId = gId
 			} else {
@@ -110,6 +114,8 @@ func (app *application) newTemplateData(r *http.Request) *templateData {
 			}
 		}
 	} else {
+
+		app.infoLog.Printf("authenticated id found in request, not generating new: %v", id)
 		if authId, ok := id.(int); ok {
 			resolvedId = authId
 		} else {

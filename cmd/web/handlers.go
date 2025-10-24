@@ -1,9 +1,11 @@
 package main
 
 import (
+	"database/sql"
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"strings"
 
 	"math"
 	"net/http"
@@ -27,81 +29,91 @@ type userLoginForm struct {
 }
 
 func (app *application) websocket(w http.ResponseWriter, r *http.Request) {
-	gId := app.sessionManager.Get(r.Context(), "guestUserId")
-	aId := app.sessionManager.Get(r.Context(), "authenticatedUserId")
-	app.infoLog.Printf("\nguest id: %v \nuser id: %v", gId, aId)
-	var player *models.Player
-
-	if aId != nil {
-		// Kirjautunut käyttäjä
-		app.infoLog.Print("Handling authenticated user")
-		if authId, ok := aId.(int); ok {
-			exists, err := app.users.Exists(authId)
-			if err != nil {
-				app.errorLog.Printf("Error checking user existence: %v", err)
-				return
-			}
-
-			if exists {
-				user, err := app.users.Get(authId)
-				if err != nil {
-					app.errorLog.Printf("Error getting user: %v", err)
-					return
-				}
-
-				player, err = app.players.GetByUser(*user)
-				if err != nil {
-					// Luodaan pelaaja käyttäjälle, jos ei löydy tietokannasta
-					newPlayer := models.Player{
-						UserId: int(user.Id),
-						Name:   user.Username,
-					}
-					err = app.players.Insert(newPlayer)
-					if err != nil {
-						app.errorLog.Printf("Error inserting player: %v", err)
-						return
-					}
-					player = &newPlayer
-				}
-			}
-		} else {
-			app.errorLog.Printf("Invalid authenticated user ID type: %T", aId)
-			return
-		}
-	} else if gId != nil {
-		// Vieraskäyttäjä
-		app.infoLog.Print("Handling guest user")
-		if guestId, ok := gId.(int); ok {
-			guestPlayer := models.Player{
-				UserId: guestId,
-				Name:   namegen.New().Get(),
-			}
-			err := app.players.Insert(guestPlayer)
-			if err != nil {
-				app.errorLog.Printf("Error inserting guest player: %v", err)
-				return
-			}
-			player = &guestPlayer
-		} else {
-			app.errorLog.Printf("Invalid guest ID type: %T", gId)
-			return
-		}
-	} else {
-		app.errorLog.Print("No valid user ID found")
-		return
-	}
-
-	if player == nil {
-		app.errorLog.Print("Failed to create/retrieve player")
-		return
-	}
-
 	conn, err := app.upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		app.infoLog.Printf("WebSocket upgrade error: %v", err)
 		return
 	}
 	defer conn.Close()
+
+	// initial read user id:n tarkisatamista varten
+	var player *models.Player
+	_, data, err := conn.ReadMessage()
+	if err != nil {
+		app.infoLog.Printf("Initial webSocket read error: %v", err)
+	} else {
+		floats := make([]float64, len(data)/8)
+		for i := range floats {
+			bits := binary.LittleEndian.Uint64(data[i*8 : (i+1)*8])
+			floats[i] = math.Float64frombits(bits)
+		}
+		id := int(floats[0])
+
+		app.infoLog.Printf("id from game to backend: %v", id)
+		// guest id on random tyypin 32-bit unsigned integer
+		// jos id on pienempi kuin, 1000000000 niin se on käyttäjä id
+		// (täytyy vain toivoa, että tällä ei tule olemaan yli miljardi käyttäjää)
+		if id <= 999999999 {
+			app.infoLog.Print("Handling user")
+			user, err := app.users.Get(id)
+			if err != nil {
+				app.errorLog.Printf("Error getting user: %v", err)
+				return
+			}
+
+			player, err = app.players.GetByUser(*user)
+			if err != nil {
+				// Luodaan pelaaja käyttäjälle, jos ei löydy tietokannasta
+				app.errorLog.Printf("Error in player query: %v", err)
+				app.infoLog.Printf("Creating new player session")
+				newPlayer := models.NewPlayer(*user)
+				err = app.players.Insert(newPlayer)
+				if err != nil {
+					app.errorLog.Printf("Error inserting player: %v", err)
+					return
+				}
+				player = &newPlayer
+			} else {
+				app.infoLog.Printf("Found player session, attaching client to that. name: %v, id: %v", player.Name, player.Id)
+			}
+		} else if id > 999999999 {
+			// Vieraskäyttäjä
+			app.infoLog.Print("Handling guest user")
+			guestPlayer, err := app.players.GetById(id)
+			if err != nil {
+				if errors.Is(err, sql.ErrNoRows) {
+					app.infoLog.Print("Player not found, creating new guest player")
+
+					// nimi generaattori
+					name_schema := []namegen.DictType{
+						namegen.Adjectives,
+					}
+					ngen := namegen.NewWithDicts(name_schema)
+					name := strings.Join([]string{ngen.Get(), "stranger"}, "-")
+					app.infoLog.Printf("Playername: %v", name)
+
+					newPlayer := models.NewGuestPlayer(id, name)
+					err := app.players.Insert(newPlayer)
+					if err != nil {
+						app.errorLog.Printf("Error inserting guest player: %v", err)
+						return
+					}
+					guestPlayer = &newPlayer
+
+				} else {
+					app.errorLog.Printf("Database error getting player: %v", err)
+					return
+				}
+			} else {
+				app.infoLog.Printf("player found by query. name: %v, id: %v", guestPlayer.Name, guestPlayer.Id)
+			}
+
+			player = guestPlayer
+		} else {
+			app.errorLog.Print("No valid user ID from the game")
+			return
+		}
+	}
 
 	app.infoLog.Printf("WebSocket connected: %v", conn.LocalAddr().String())
 
@@ -161,7 +173,6 @@ func (app *application) home(writer http.ResponseWriter, request *http.Request) 
 
 func (app *application) game(writer http.ResponseWriter, request *http.Request) {
 	data := app.newTemplateData(request)
-
 	app.render(writer, http.StatusOK, "game.tmpl", data)
 }
 
