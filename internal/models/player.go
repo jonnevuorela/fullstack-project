@@ -3,6 +3,7 @@ package models
 import (
 	"database/sql"
 	"errors"
+	"log"
 	"time"
 
 	"github.com/go-sql-driver/mysql"
@@ -14,6 +15,7 @@ type Player struct {
 	Name       string
 	CreateTime time.Time
 	LastActive time.Time
+	Location   *Location
 }
 
 type PlayerModel struct {
@@ -22,8 +24,46 @@ type PlayerModel struct {
 
 type PlayerModelIntarface interface {
 	Insert(player Player) error
+	GetAllActive() ([]*Player, error)
 	GetByUser(user User) (*Player, error)
 	GetById(id int) (*Player, error)
+	UpdateActivity(id int) error
+}
+
+func (p *PlayerModel) UpdateActivity(id int) error {
+	stmt := `UPDATE players SET last_active = CURRENT_TIMESTAMP WHERE id = ?`
+	_, err := p.DB.Exec(stmt, id)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (p *PlayerModel) GetAllActive() ([]*Player, error) {
+	stmt := "SELECT * FROM players WHERE last_active > NOW() - INTERVAL 1 MINUTE"
+	rows, err := p.DB.Query(stmt)
+	if err != nil {
+		log.Printf("Error querying active player rows: %v", err)
+		return nil, err
+	}
+	defer rows.Close()
+
+	var players []*Player
+	for rows.Next() {
+		player := Player{}
+		err = rows.Scan(
+			&player.Id,
+			&player.UserId,
+			&player.Name,
+			&player.CreateTime,
+			&player.LastActive,
+		)
+		players = append(players, &player)
+	}
+	if err != nil {
+		return nil, err
+	}
+	return players, nil
 }
 
 func (p *PlayerModel) GetByUser(user User) (*Player, error) {

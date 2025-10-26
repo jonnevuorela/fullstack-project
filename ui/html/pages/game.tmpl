@@ -4,8 +4,8 @@
         <div id="gameCanvas"/></div>
     </div>
     <script nonce="{{.Nonce}}">
-    window.playerId = {{.PlayerID}};
-    console.log("Template PlayerID:", window.playerId, typeof window.playerId);
+    playerId = {{.PlayerID}};
+    console.log("Template PlayerID:", playerId, typeof playerId);
     </script>
     <script type="module" nonce="{{.Nonce}}" src="/static/game/game.bundle.js"></script>
 {{end}}

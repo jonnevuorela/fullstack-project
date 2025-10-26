@@ -7,10 +7,12 @@ import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 
 import initJolt from "jolt-physics";
+import { velocity } from "three/src/nodes/TSL.js";
 
 const LAYER_NON_MOVING = 0;
 const LAYER_MOVING = 1;
 const NUM_LAYERS = 2;
+
 
 const State = {
     READY: 0,
@@ -69,6 +71,8 @@ class Game {
         this.playerController = null;
         this.keyState = {};
         this.playerId = window.playerId;
+        this.playerActive = false;
+        this.lastActivityTime = Date.now();
 
         // vehicle physics and rendering
         this.vehicle = null;
@@ -205,7 +209,7 @@ class Game {
         tickContainer.appendChild(redline);
     }
 
-    addDebugLog(type, text, ttl = 10) {
+    addDebugLog(type, text, ttl = 5) {
         const now = new Date();
         const timeStr = now.toLocaleTimeString("en-US", { hour12: false });
         const entry = { type, text, time: timeStr, ttl };
@@ -825,6 +829,7 @@ class Game {
 
             this.tempRVec.Set(0, 0, 0);
             this.tempQuat.Set(0, 0, 0, 1);
+
 
             this.createAndAddBody(
                 mapShapeSettings,
@@ -1480,6 +1485,22 @@ class Game {
     setupControls() {
         this.setState(State.LOADING);
         console.log("Setting up controls");
+
+        const updateActivity = () => {
+            this.playerActive = true;
+            this.lastActivityTime = Date.now();
+        };
+
+        document.addEventListener('mousemove', () => {
+            if (this.controls) {
+                updateActivity();
+            }
+        });
+
+        document.addEventListener('click', () => {
+            updateActivity();
+        });
+
         try {
             const input = {
                 forwardPressed: false,
@@ -1491,8 +1512,10 @@ class Game {
 
             this.input = input;
 
+
             const keyDownHandler = (event) => {
                 const keyCode = event.key;
+                updateActivity();
                 if (keyCode == "w") {
                     input.forwardPressed = true;
                 } else if (keyCode == "s") {
@@ -1719,6 +1742,8 @@ class Game {
 
         const deltaTime = this.clock.getDelta();
         try {
+            this.checkActivity();
+
             this.prePhysicsUpdate();
 
             this.updatePhysics(deltaTime);
@@ -1735,6 +1760,14 @@ class Game {
             this.setState(State.ERROR, `Animation error: ${error.message}`);
         }
     }
+
+    checkActivity() {
+        const now = Date.now();
+        if (now - this.lastActivityTime > 10000) {
+            this.playerActive = false;
+        }
+    }
+
 
     // AI:n tekemä: Create a recursive function that creates a pyramid out of cubes with createbody function. Grok 3
     async createPyramid(
@@ -1865,6 +1898,53 @@ class Game {
             this.setNetworkState(NetworkState.DISCONNECTED);
             cleanup();
         });
+        this.ws.addEventListener("message", async (event) => {
+            const buffer = event.data.arrayBuffer ?
+                await event.data.arrayBuffer() :
+                event.data;
+
+            const data = new Float64Array(buffer);
+
+            console.log("Received data length:", data.length);
+
+            const valuesPerPlayer = 12;
+            const playerCount = data.length / valuesPerPlayer;
+
+            const players = [];
+
+            for (let i = 0; i < playerCount; i++) {
+                const baseIndex = i * valuesPerPlayer;
+                const player = {
+                    player_id: data[baseIndex],
+                    position: {
+                        x: data[baseIndex + 1],
+                        y: data[baseIndex + 2],
+                        z: data[baseIndex + 3]
+                    },
+                    rotation: {
+                        x: data[baseIndex + 4],
+                        y: data[baseIndex + 5],
+                        z: data[baseIndex + 6],
+                        w: data[baseIndex + 7]
+                    },
+                    velocity: {
+                        x: data[baseIndex + 8],
+                        y: data[baseIndex + 9],
+                        z: data[baseIndex + 10]
+                    },
+                    activity: data[baseIndex + 11]
+                };
+                players.push(player);
+            }
+
+            if (playerCount > 0) {
+                this.addDebugLog("info", `Received data for ${players.length} players:\n${JSON.stringify(players, null, 2)}`);
+            } else {
+                this.addDebugLog("info", "no other players data received")
+            }
+
+            this.updateOtherPlayers(players);
+        });
 
         this.ws.addEventListener("open", () => {
             this.addDebugLog("info", "Websocket connected");
@@ -1902,6 +1982,7 @@ class Game {
                             position: this.playerPosition,
                             rotation: this.playerRotation,
                             velocity: this.playerVelocity,
+                            active: this.playerActive
                         };
 
                         data = new Float64Array([
@@ -1916,6 +1997,7 @@ class Game {
                             this.playerVelocity.x,
                             this.playerVelocity.y,
                             this.playerVelocity.z,
+                            this.playerActive ? 1.0 : 0.0
                         ]);
 
                         const packetStr = JSON.stringify(packet, null, 2);
@@ -2120,6 +2202,7 @@ class Game {
         this.physicsSystem = null;
         this.joltInterface = null;
     }
+
 }
 
 document.addEventListener("DOMContentLoaded", () => {

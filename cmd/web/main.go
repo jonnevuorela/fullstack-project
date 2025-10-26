@@ -26,6 +26,7 @@ type application struct {
 	infoLog        *log.Logger
 	users          models.UserModelInterface
 	players        models.PlayerModelIntarface
+	locations      models.LocationModelIntarface
 	templateCache  map[string]*template.Template
 	sessionManager *scs.SessionManager
 	upgrader       websocket.Upgrader
@@ -105,8 +106,9 @@ func main() {
 		formDecoder:    formDecoder,
 		upgrader:       upgrader,
 
-		users:   &models.UserModel{DB: db},
-		players: &models.PlayerModel{DB: db},
+		users:     &models.UserModel{DB: db},
+		players:   &models.PlayerModel{DB: db},
+		locations: &models.LocationModel{DB: db},
 	}
 
 	srv := &http.Server{
@@ -119,6 +121,8 @@ func main() {
 	}
 
 	infoLog.Printf("Starting server on https://%s", *addr)
+	// Self signed certifcaatit local developmentia varten,
+	// prod serverillä cloudflare huolehtii TLS.
 	err = srv.ListenAndServeTLS("./tls/cert.pem", "./tls/key.pem")
 	errorLog.Fatal(err)
 }

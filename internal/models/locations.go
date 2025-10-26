@@ -22,18 +22,103 @@ type Location struct {
 
 type LocationModelIntarface interface {
 	Get(id int) (*Location, error)
-	Insert(id int, location Location) error
+	Save(id int, location Location) error
 	UpdateLocationFromDB(id int, location *Location) error
 	UpdateDBWithLocation(id int, location Location) error
+	Insert(id int, location Location) error
 }
 
 type LocationModel struct {
 	DB *sql.DB
 }
 
+func (l *LocationModel) Save(id int, location Location) error {
+	stmt := `INSERT INTO locations (
+        players_id,
+        position_x, position_y, position_z,
+        rotation_x, rotation_y, rotation_z, rotation_w,
+        velocity_x, velocity_y, velocity_z
+    ) VALUES (
+        ?,
+        ?, ?, ?,
+        ?, ?, ?, ?,
+        ?, ?, ?
+    ) ON DUPLICATE KEY UPDATE
+        position_x = VALUES(position_x),
+        position_y = VALUES(position_y),
+        position_z = VALUES(position_z),
+        rotation_x = VALUES(rotation_x),
+        rotation_y = VALUES(rotation_y),
+        rotation_z = VALUES(rotation_z),
+        rotation_w = VALUES(rotation_w),
+        velocity_x = VALUES(velocity_x),
+        velocity_y = VALUES(velocity_y),
+        velocity_z = VALUES(velocity_z)`
+
+	_, err := l.DB.Exec(stmt,
+		id,
+		location.PositionX, location.PositionY, location.PositionZ,
+		location.RotationX, location.RotationY, location.RotationZ, location.RotationW,
+		location.VelocityX, location.VelocityY, location.VelocityZ,
+	)
+
+	if err != nil {
+		var mySQLError *mysql.MySQLError
+		if errors.As(err, &mySQLError) {
+			return mySQLError
+		}
+		return err
+	}
+
+	return nil
+}
+
+func (l *LocationModel) Get(id int) (*Location, error) {
+	location := NewLocation()
+	stmt := "SELECT * FROM locations WHERE players_id = ?"
+	err := l.DB.QueryRow(stmt, id).Scan(
+		&id,
+		&location.PositionX, &location.PositionY, &location.PositionZ,
+		&location.RotationX, &location.RotationY, &location.RotationZ, &location.RotationW,
+		&location.VelocityX, &location.VelocityY, &location.VelocityZ,
+	)
+
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	return &location, err
+}
+
+// Käytettäväksi hot looppien sisällä päivittämään olemassa oleva
+// location uuden allocoimisen sijaan.
+func (l *LocationModel) UpdateLocationFromDB(id int, location *Location) error {
+	stmt := "SELECT * FROM locations WHERE players_id= ?"
+	err := l.DB.QueryRow(stmt, id).Scan(
+		&id,
+		&location.PositionX, &location.PositionY, &location.PositionZ,
+		&location.RotationX, &location.RotationY, &location.RotationZ, &location.RotationW,
+		&location.VelocityX, &location.VelocityY, &location.VelocityZ,
+	)
+	if err != nil {
+		var mySQLError *mysql.MySQLError
+		if errors.As(err, &mySQLError) {
+			return mySQLError
+		} else {
+			return err
+		}
+	}
+	return nil
+}
+
+// Insert
+// Kannattaa käyttää Save functiota jos mahdollista
 func (l *LocationModel) Insert(id int, location Location) error {
 	stmt := `INSERT INTO locations (
-		players_user_id,
+		players_id
 		position_x, position_y, position_z,
 		rotation_x, rotation_y, rotation_z, rotation_w,
 		velocity_x, velocity_y, velocity_z
@@ -58,32 +143,14 @@ func (l *LocationModel) Insert(id int, location Location) error {
 	return nil
 }
 
-// Käytettäväksi hot looppien sisällä päivittämään olemassa oleva
-// location uuden allocoimisen sijaan.
-func (l *LocationModel) UpdateLocationFromDB(id int, location *Location) error {
-	stmt := "SELECT * FROM locations WHERE players_user_id = ?"
-	err := l.DB.QueryRow(stmt, id).Scan(
-		&location.PositionX, &location.PositionY, &location.PositionZ,
-		&location.RotationX, &location.RotationY, &location.RotationZ, &location.RotationW,
-		&location.VelocityX, &location.VelocityY, &location.VelocityZ,
-	)
-	if err != nil {
-		var mySQLError *mysql.MySQLError
-		if errors.As(err, &mySQLError) {
-			return mySQLError
-		} else {
-			return err
-		}
-	}
-	return nil
-}
-
+// UpdateDBWithLocation
+// Kannattaa käyttää Save functiota jos mahdollista
 func (l *LocationModel) UpdateDBWithLocation(id int, location Location) error {
 	stmt := `UPDATE locations
 				SET position_x = ?, position_y = ?, position_z = ?,
 					 rotation_x = ?, rotation_y = ?, rotation_z = ?, rotation_w = ?,
 					 velocity_x = ?, velocity_y = ?, velocity_z = ?
-				WHERE players_user_id = ?`
+				WHERE players_id= ?`
 
 	_, err := l.DB.Exec(stmt,
 		location.PositionX, location.PositionY, location.PositionZ,
@@ -100,22 +167,6 @@ func (l *LocationModel) UpdateDBWithLocation(id int, location Location) error {
 		}
 	}
 	return nil
-}
-
-func (l *LocationModel) Get(id int) (*Location, error) {
-	location := NewLocation()
-	stmt := "SELECT * FROM locations WHERE players_user_id = ?"
-	err := l.DB.QueryRow(stmt, id).Scan(
-		&location.PositionX, &location.PositionY, &location.PositionZ,
-		&location.RotationX, &location.RotationY, &location.RotationZ, &location.RotationW,
-		&location.VelocityX, &location.VelocityY, &location.VelocityZ,
-	)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return &location, err
 }
 
 func NewLocation() Location {

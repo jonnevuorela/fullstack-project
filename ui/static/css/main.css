@@ -337,12 +337,13 @@ footer {
     position: absolute;
     top: 2%;
     left: 2%;
-    max-width: 380px;
+    max-width: 500px;
     max-height: 350px;
     overflow-y: auto;
     padding: 1.2%;
     z-index: 1002;
     pointer-events: auto;
+    scrollbar-width: none;
 }
 
 .debug-log-entry {
