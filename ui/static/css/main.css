@@ -1,5 +1,5 @@
-:root{
-   --network-status-color: #808080;
+:root {
+    --network-status-color: #808080;
 }
 
 * {
@@ -10,7 +10,8 @@
     font-family: "Ubuntu Mono", monospace;
 }
 
-html, body {
+html,
+body {
     height: 100%;
 }
 
@@ -20,7 +21,10 @@ body {
     color: #34495E;
 }
 
-header, nav, main, footer {
+header,
+nav,
+main,
+footer {
     padding: 2px calc((100% - 800px) / 2) 0;
 }
 
@@ -98,7 +102,8 @@ nav a.live:after {
     -webkit-transform: rotate(-45deg);
 }
 
-a.button, input[type="submit"] {
+a.button,
+input[type="submit"] {
     background-color: #003049;
     border-radius: 3px;
     color: #FFFFFF;
@@ -109,7 +114,8 @@ a.button, input[type="submit"] {
     font-weight: 700;
 }
 
-a.button:hover, input[type="submit"]:hover {
+a.button:hover,
+input[type="submit"]:hover {
     background-color: #00222c;
     color: #FFFFFF;
     cursor: pointer;
@@ -128,12 +134,17 @@ form input[type="radio"] {
     margin-left: 18px;
 }
 
-form input[type="username"], form input[type="password"], form input[type="email"] {
+form input[type="username"],
+form input[type="password"],
+form input[type="email"] {
     padding: 0.75em 18px;
     width: 100%;
 }
 
-form input[type="username"], form input[type="password"], form input[type="email"], textarea {
+form input[type="username"],
+form input[type="password"],
+form input[type="email"],
+textarea {
     color: #003049;
     background: #FFFFFF;
     border: 1px solid #E4E5E7;
@@ -151,7 +162,8 @@ form label {
     display: block;
 }
 
-.error + textarea, .error + input {
+.error+textarea,
+.error+input {
     border-color: #C0392B !important;
     border-width: 2px !important;
 }
@@ -176,7 +188,8 @@ button:hover {
     cursor: pointer;
 }
 
-textarea, input:not([type="submit"]) {
+textarea,
+input:not([type="submit"]) {
     font-size: 18px;
     font-family: "Ubuntu Mono", monospace;
 }
@@ -209,147 +222,152 @@ footer {
     text-align: center;
 }
 
-#gameCanvas {
-}
+#gameCanvas {}
 
 .game-container {
-  position: absolute;
-  left: 5%;
-  right: 5%;
+    position: absolute;
+    left: 5%;
+    right: 5%;
 }
 
 .game-overlay {
-  position: relative;
-  inset: 0;
-  z-index: 100;
+    position: relative;
+    inset: 0;
+    z-index: 100;
 }
 
-#gameUi {
-}
+#gameUi {}
 
 .rpm-meter {
-  position: absolute;
-  bottom: 2%;
-  right: 2%;
-  background: rgba(0,0,0,0.5);
-  color: #fff;
-  padding: 8px 16px;
-  font-size: 22px;
-  font-weight: bold;
+    position: absolute;
+    bottom: 2%;
+    right: 2%;
+    background: rgba(0, 0, 0, 0.5);
+    color: #fff;
+    padding: 8px 16px;
+    font-size: 22px;
+    font-weight: bold;
 }
 
 .network-status-icon {
-  position: absolute;
-  top: 2%;
-  right: 2%;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  background-color: var(--network-status-color, #808080);
-  border: 1px solid #001;
-  transition: background-color 1s;
+    position: absolute;
+    top: 2%;
+    right: 2%;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background-color: var(--network-status-color, #808080);
+    border: 1px solid #001;
+    transition: background-color 1s;
 }
 
 .game-pop {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
 
-  background: rgba(3, 80, 155, 0.8);
-  color: #fff;
-  padding: 0.8% 1.6%;
-  margin-bottom: 10px;
-  font-size: 18px;
-  font-weight: bold;
-  box-shadow: 2px 2px 8px rgba(0,0,0,0.4);
+    background: rgba(3, 80, 155, 0.8);
+    color: #fff;
+    padding: 0.8% 1.6%;
+    margin-bottom: 10px;
+    font-size: 18px;
+    font-weight: bold;
+    box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.4);
 }
 
 .close-pop {
-  position: absolute;
-  top: 8px;
-  right: 10px;
+    position: absolute;
+    top: 8px;
+    right: 10px;
 
-  background: transparent;
-  border: none;
-  font-size: 22px;
-  font-weight: bold;
-  cursor: pointer;
-  color: #eee;
+    background: transparent;
+    border: none;
+    font-size: 22px;
+    font-weight: bold;
+    cursor: pointer;
+    color: #eee;
 }
 
-.game-hint, .game-tip {
-  position: absolute;
-  top: 10%;
-  left: 90%;
-  transform: translate(-10%, -90%);
+.game-hint,
+.game-tip {
+    position: absolute;
+    top: 10%;
+    left: 90%;
+    transform: translate(-10%, -90%);
 
-  color: #bfffbf;
-  display: flex;
-  align-items: baseline;
-  margin-bottom: 5px;
-  background: rgba(20,20,20,0.7);
-  font-family: "Ubuntu Mono", monospace;
+    color: #bfffbf;
+    display: flex;
+    align-items: baseline;
+    margin-bottom: 5px;
+    background: rgba(20, 20, 20, 0.7);
+    font-family: "Ubuntu Mono", monospace;
 }
 
 .spinner-overlay {
-  position: absolute;
-  inset: 0;
-  pointer-events: auto;
-  width: 100%;
-  height: 100%;
-  z-index: 1001;
-  background: rgba(0,0,0,0.15);
-  backdrop-filter: blur(20px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+    position: absolute;
+    inset: 0;
+    pointer-events: auto;
+    width: 100%;
+    height: 100%;
+    z-index: 1001;
+    background: rgba(0, 0, 0, 0.15);
+    backdrop-filter: blur(20px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .spinner {
-  width: 60px; height: 60px;
-  border: 7px solid #eee;
-  border-top: 7px solid #3498db;
-  border-radius: 50%;
-  animation: spin 1.1s linear infinite;
+    width: 60px;
+    height: 60px;
+    border: 7px solid #eee;
+    border-top: 7px solid #3498db;
+    border-radius: 50%;
+    animation: spin 1.1s linear infinite;
 }
-@keyframes spin { 100% { transform: rotate(360deg); } }
+
+@keyframes spin {
+    100% {
+        transform: rotate(360deg);
+    }
+}
 
 .debug-log {
-  position: absolute;
-  top: 2%;
-  left: 2%;
-  max-width: 380px;
-  max-height: 350px;
-  overflow-y: auto;
-  padding: 1.2%;
-  z-index: 1002;
-  pointer-events: auto;
+    position: absolute;
+    top: 2%;
+    left: 2%;
+    max-width: 380px;
+    max-height: 350px;
+    overflow-y: auto;
+    padding: 1.2%;
+    z-index: 1002;
+    pointer-events: auto;
 }
 
 .debug-log-entry {
-  display: flex;
-  align-items: baseline;
-  margin-bottom: 5px;
-  background: rgba(20,20,20,0.7);
-  font-family: "Ubuntu Mono", monospace;
+    display: flex;
+    align-items: baseline;
+    margin-bottom: 5px;
+    background: rgba(20, 20, 20, 0.7);
+    font-family: "Ubuntu Mono", monospace;
 }
 
 .debug-log-entry .debug-time {
-  color: #aaa;
-  font-size: 12px;
-  min-width: 60px;
-  margin-right: 8px;
+    color: #aaa;
+    font-size: 12px;
+    min-width: 60px;
+    margin-right: 8px;
 }
 
 .debug-log-entry.debug-error .debug-text {
-  color: #ffdddd;
-  background: rgba(200,0,0,0.6);
-  padding: 2px 5px;
-  border-radius: 3px;
-  font-weight: bold;
+    color: #ffdddd;
+    background: rgba(200, 0, 0, 0.6);
+    padding: 2px 5px;
+    border-radius: 3px;
+    font-weight: bold;
 }
 
 .debug-log-entry.debug-info .debug-text {
-  color: #bfffbf;
+    color: #bfffbf;
 }
