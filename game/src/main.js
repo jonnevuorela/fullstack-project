@@ -69,6 +69,16 @@ export default class Game {
         this.debugLogContainer = null;
         this.debugMode = true;
 
+        // audio
+        this.listener = null;
+        this.audioLoader = null;
+        this.audioGloabal = null;
+        this.soundEffects = {};
+        this.audioInitialized = false;
+        this.audioContext = null;
+        this.vehicleScreechSounds = null;
+
+
         // player
         this.controls = null;
         this.playerPosition = null;
@@ -241,6 +251,14 @@ export default class Game {
         this.toastMessages.push(message)
         this.renderToastMessages();
 
+        const sound = this.audioGloabal
+        if (this.soundEffects.toast) {
+            sound.setBuffer(this.soundEffects.toast);
+            sound.setLoop(false);
+            sound.setVolume(0.5);
+            sound.play();
+
+        }
         setTimeout(() => {
             const idx = this.toastMessages.indexOf(message);
             if (idx !== -1) {
@@ -579,10 +597,64 @@ export default class Game {
 
             this.texLoader = new THREE.TextureLoader();
             this.scene.fog = new THREE.Fog(0x303b5e, 0, 300);
+
+            this.listener = new THREE.AudioListener();
+            this.audioLoader = new THREE.AudioLoader();
+            this.audioGloabal = new THREE.Audio(this.listener);
+
         } catch (error) {
             console.error("Failed to initialize scene:", error);
             this.setState(State.ERROR, error.message);
             throw error;
+        }
+    }
+
+    initAudioSystem() {
+        try {
+            this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+
+            const initAudioOnInteraction = () => {
+                if (!this.audioInitialized && this.audioContext) {
+                    this.audioContext.resume().then(() => {
+                        this.audioInitialized = true;
+                        console.log("Audio context initialized");
+
+                        this.listener = new THREE.AudioListener();
+                        if (this.camera) {
+                            this.camera.add(this.listener);
+                        }
+
+                        const soundFiles = {
+                            toast: 'static/gameAssets/shifter.wav',
+                            screechStart: 'static/gameAssets/screech_start.wav',
+                            screechLoop: 'static/gameAssets/screech.wav',
+                            screechStop: 'static/gameAssets/screech_stop.wav'
+                        };
+
+                        Object.entries(soundFiles).forEach(([key, path]) => {
+                            this.audioLoader.load(
+                                path,
+                                (buffer) => {
+                                    this.soundEffects[key] = buffer;
+                                    console.log("Audio loaded:", key);
+                                },
+                                (progress) => {
+                                    console.log(`Loading ${key}: ${(progress.loaded / progress.total * 100)}%`);
+                                },
+                                (error) => {
+                                    console.error(`Error loading ${key}:`, error);
+                                }
+                            );
+                        });
+                    });
+                }
+            };
+
+            document.addEventListener('keydown', initAudioOnInteraction, { once: true });
+            document.addEventListener('click', initAudioOnInteraction, { once: true });
+
+        } catch (error) {
+            console.error("Error in initAudioSystem:", error);
         }
     }
 
@@ -1076,6 +1148,89 @@ export default class Game {
         return compoundSettings;
     }
 
+    initWheelSounds(wheelIndex) {
+        if (!this.vehicleScreechSounds) {
+            if (!this.audioContext || !this.listener || !this.vehicleMesh) {
+                console.warn('Audio system not ready');
+                return null;
+            }
+
+            if (this.audioContext.state === 'suspended') {
+                this.audioContext.resume();
+            }
+
+            try {
+                this.vehicleScreechSounds = {
+                    start: new THREE.PositionalAudio(this.listener),
+                    loop: new THREE.PositionalAudio(this.listener),
+                    stop: new THREE.PositionalAudio(this.listener),
+                    wheelStates: [
+                        { state: 'idle', currentVolume: 0 },
+                        { state: 'idle', currentVolume: 0 },
+                        { state: 'idle', currentVolume: 0 },
+                        { state: 'idle', currentVolume: 0 }
+                    ],
+                    globalState: 'idle',
+                    maxVolume: 0
+                };
+
+                const sounds = this.vehicleScreechSounds;
+
+                if (this.soundEffects.screechStart) {
+                    sounds.start.setBuffer(this.soundEffects.screechStart);
+                    sounds.start.setVolume(0);
+                    sounds.start.setLoop(false);
+                    sounds.start.setRefDistance(10);
+                    sounds.start.setRolloffFactor(2);
+                    sounds.start.setMaxDistance(50);
+                    this.vehicleMesh.add(sounds.start);
+                }
+
+                if (this.soundEffects.screechLoop) {
+                    sounds.loop.setBuffer(this.soundEffects.screechLoop);
+                    sounds.loop.setVolume(0);
+                    sounds.loop.setLoop(true);
+                    sounds.loop.setRefDistance(10);
+                    sounds.loop.setRolloffFactor(2);
+                    sounds.loop.setMaxDistance(50);
+                    this.vehicleMesh.add(sounds.loop);
+                }
+
+                if (this.soundEffects.screechStop) {
+                    sounds.stop.setBuffer(this.soundEffects.screechStop);
+                    sounds.stop.setVolume(0);
+                    sounds.stop.setLoop(false);
+                    sounds.stop.setRefDistance(10);
+                    sounds.stop.setRolloffFactor(2);
+                    sounds.stop.setMaxDistance(50);
+                    this.vehicleMesh.add(sounds.stop);
+                }
+
+                sounds.start.onEnded = () => {
+                    if (sounds.globalState === 'starting') {
+                        sounds.globalState = 'screeching';
+                        if (sounds.loop && !sounds.loop.isPlaying) {
+                            sounds.loop.play();
+                        }
+                    }
+                };
+
+                sounds.stop.onEnded = () => {
+                    if (sounds.globalState === 'stopping') {
+                        sounds.globalState = 'idle';
+                    }
+                };
+
+                console.log("Vehicle screech sounds initialized");
+            } catch (error) {
+                console.error('Error initializing vehicle sounds:', error);
+                return null;
+            }
+        }
+
+        return this.vehicleScreechSounds;
+    }
+
     createUnitCylinder(
         radius = 0.05,
         material = new THREE.MeshPhongMaterial({ color: 0x222222 }),
@@ -1441,6 +1596,88 @@ export default class Game {
                         suspensionImpulse;
                     resultObj.mLateralImpulse = lateralFriction *
                         suspensionImpulse;
+
+                    try {
+                        if (!this.soundEffects.screechLoop) return;
+
+                        const sounds = this.initWheelSounds(wheelIndex);
+                        if (!sounds) return;
+
+                        const slipMagnitude = Math.sqrt(
+                            longitudinalSlip * longitudinalSlip +
+                            lateralSlip * lateralSlip
+                        );
+
+                        const slipThreshold = 1;
+                        const wheelVolume = slipMagnitude > slipThreshold
+                            ? Math.min((slipMagnitude - slipThreshold) * 1, 1.0)
+                            : 0;
+
+                        sounds.wheelStates[wheelIndex].currentVolume = wheelVolume;
+
+                        const maxVolume = Math.max(
+                            sounds.wheelStates[0].currentVolume,
+                            sounds.wheelStates[1].currentVolume,
+                            sounds.wheelStates[2].currentVolume,
+                            sounds.wheelStates[3].currentVolume
+                        );
+
+                        const isSlipping = maxVolume > 0.01;
+
+                        switch (sounds.globalState) {
+                            case 'idle':
+                                if (isSlipping) {
+                                    sounds.globalState = 'starting';
+                                    sounds.maxVolume = maxVolume;
+                                    sounds.start.setVolume(maxVolume);
+                                    sounds.start.play();
+                                    console.log('Vehicle starting screech');
+                                }
+                                break;
+
+                            case 'starting':
+                                sounds.start.setVolume(maxVolume);
+                                sounds.maxVolume = maxVolume;
+
+                                if (!isSlipping) {
+                                    sounds.globalState = 'idle';
+                                    sounds.start.stop();
+                                }
+                                break;
+
+                            case 'screeching':
+                                if (isSlipping) {
+                                    const smoothing = 0.15;
+                                    const newVolume = sounds.maxVolume +
+                                        (maxVolume - sounds.maxVolume) * smoothing;
+                                    sounds.loop.setVolume(newVolume);
+                                    sounds.maxVolume = newVolume;
+
+                                    if (!sounds.loop.isPlaying) {
+                                        sounds.loop.play();
+                                    }
+                                } else {
+                                    sounds.loop.stop();
+                                    sounds.globalState = 'stopping';
+                                    sounds.stop.setVolume(sounds.maxVolume);
+                                    sounds.stop.play();
+                                }
+                                break;
+
+                            case 'stopping':
+                                if (isSlipping) {
+                                    sounds.stop.stop();
+                                    sounds.globalState = 'screeching';
+                                    sounds.maxVolume = maxVolume;
+                                    sounds.loop.setVolume(maxVolume);
+                                    sounds.loop.play();
+                                }
+                                break;
+                        }
+
+                    } catch (error) {
+                        this.addDebugLog("error", `Error in tire sound processing: ${error}`);
+                    }
                 };
                 controllerCallbacks.SetWheeledVehicleController(
                     this.playerController,
@@ -2160,6 +2397,11 @@ export default class Game {
 
             try {
                 this.initScene();
+            } catch (e) {
+                throw e;
+            }
+            try {
+                this.initAudioSystem();
             } catch (e) {
                 throw e;
             }
