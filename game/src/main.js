@@ -7,12 +7,13 @@ import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 
 import initJolt from "jolt-physics";
-import { velocity } from "three/src/nodes/TSL.js";
+
+import RemotePlayer from "./remotePlayer.js";
 
 const LAYER_NON_MOVING = 0;
 const LAYER_MOVING = 1;
 const NUM_LAYERS = 2;
-
+const PACKET_INTERVAL = 1000;
 
 const State = {
     READY: 0,
@@ -26,7 +27,7 @@ const NetworkState = {
     CONNECTING: 2,
 };
 
-class Game {
+export default class Game {
     constructor() {
         // core
         this.scene = null;
@@ -62,6 +63,7 @@ class Game {
 
         this.debugLog = [];
         this.debugLogContainer = null;
+        this.debugMode = false;
 
         // player
         this.controls = null;
@@ -73,6 +75,9 @@ class Game {
         this.playerId = window.playerId;
         this.playerActive = false;
         this.lastActivityTime = Date.now();
+
+        // other players
+        this.otherPlayers = new Map();
 
         // vehicle physics and rendering
         this.vehicle = null;
@@ -149,8 +154,9 @@ class Game {
 
             this.addTickMarks();
             // Keep reference for adding elements later
-            this.uiDynamicContainer =
-                this.uiOverlay.querySelector("#ui-dynamic");
+            this.uiDynamicContainer = this.uiOverlay.querySelector(
+                "#ui-dynamic",
+            );
             this.RpmGaugeSvg = this.uiOverlay.querySelector("#rpm-gauge");
             this.RpmGaugeNeedle = this.uiOverlay.querySelector("#rpm-needle");
             this.RpmGaugeValue = this.uiOverlay.querySelector("#rpm-value");
@@ -257,22 +263,25 @@ class Game {
     }
 
     renderDebugLog() {
-        if (!this.debugLogContainer) {
-            this.debugLogContainer = document.createElement("div");
-            this.debugLogContainer.className = "debug-log";
-            this.canvasContainer.appendChild(this.debugLogContainer);
-        }
-        this.debugLogContainer.innerHTML = this.debugLog
-            .map(
-                (entry) => `
+        if (this.debugMode) {
+
+            if (!this.debugLogContainer) {
+                this.debugLogContainer = document.createElement("div");
+                this.debugLogContainer.className = "debug-log";
+                this.canvasContainer.appendChild(this.debugLogContainer);
+            }
+            this.debugLogContainer.innerHTML = this.debugLog
+                .map(
+                    (entry) => `
                 <div class="debug-log-entry debug-${entry.type}">
                     <span class="debug-time">${entry.time}</span>
                     <span class="debug-text">${entry.text}</span>
                 </div>
                 `,
-            )
-            .join("");
-        this.debugLogContainer.scrollTop = this.debugLogContainer.scrollHeight;
+                )
+                .join("");
+            this.debugLogContainer.scrollTop = this.debugLogContainer.scrollHeight;
+        }
     }
 
     showSpinner() {
@@ -303,7 +312,8 @@ class Game {
 
     showError(message) {
         this.initOverlay();
-        this.overlayContent.innerHTML = `<div class="overlay-error">${message || "An error occurred."}</div>`;
+        this.overlayContent.innerHTML = `<div class="overlay-error">${message || "An error occurred."
+            }</div>`;
     }
 
     clearError() {
@@ -422,8 +432,8 @@ class Game {
 
             settings.mObjectLayerPairFilter = objectFilter;
             settings.mBroadPhaseLayerInterface = bpInterface;
-            settings.mObjectVsBroadPhaseLayerFilter =
-                new this.Jolt.ObjectVsBroadPhaseLayerFilterTable(
+            settings.mObjectVsBroadPhaseLayerFilter = new this.Jolt
+                .ObjectVsBroadPhaseLayerFilterTable(
                     bpInterface,
                     NUM_BROAD_PHASE_LAYERS,
                     objectFilter,
@@ -480,8 +490,9 @@ class Game {
             this.renderer.setSize(width, height);
             this.renderer.setPixelRatio(window.devicePixelRatio);
 
-            if (!this.canvasContainer)
+            if (!this.canvasContainer) {
                 throw new Error("gameCanvas element not found");
+            }
             this.canvasContainer.appendChild(this.renderer.domElement);
 
             this.controls = new OrbitControls(
@@ -812,8 +823,9 @@ class Game {
             mapModel.position.set(0, 0, 0);
             mapModel.quaternion.set(0, 0, 0, 1);
 
-            const triangleList =
-                this.createTriangleListFromThreeObject(mapModel);
+            const triangleList = this.createTriangleListFromThreeObject(
+                mapModel,
+            );
             if (!triangleList) {
                 console.error("Failed to create TriangleList from road model");
                 this.setState(
@@ -829,7 +841,6 @@ class Game {
 
             this.tempRVec.Set(0, 0, 0);
             this.tempQuat.Set(0, 0, 0, 1);
-
 
             this.createAndAddBody(
                 mapShapeSettings,
@@ -867,8 +878,9 @@ class Game {
             roadsModel.position.set(0, 0, 0);
             roadsModel.quaternion.set(0, 0, 0, 1);
 
-            const triangleList =
-                this.createTriangleListFromThreeObject(roadsModel);
+            const triangleList = this.createTriangleListFromThreeObject(
+                roadsModel,
+            );
             if (!triangleList) {
                 console.error("Failed to create TriangleList from roads model");
                 this.setState(
@@ -1067,8 +1079,8 @@ class Game {
         this.tempRVec.Set(10, 0, -30);
         this.tempQuat.Set(0, 180, 0, 1);
         try {
-            const carShapeSettings =
-                new this.Jolt.OffsetCenterOfMassShapeSettings(
+            const carShapeSettings = new this.Jolt
+                .OffsetCenterOfMassShapeSettings(
                     new this.Jolt.Vec3(0, -halfVehicleHeight, 0),
                     this.createCarShape(
                         halfVehicleWidth,
@@ -1236,8 +1248,8 @@ class Game {
                     );
                 });
 
-                const controllerSettings =
-                    new this.Jolt.WheeledVehicleControllerSettings();
+                const controllerSettings = new this.Jolt
+                    .WheeledVehicleControllerSettings();
 
                 // Powertrain
                 const engine = controllerSettings.get_mEngine();
@@ -1255,8 +1267,8 @@ class Game {
 
                 // Rear differential
                 controllerSettings.mDifferentials.clear();
-                const rearWheelDrive =
-                    new this.Jolt.VehicleDifferentialSettings();
+                const rearWheelDrive = new this.Jolt
+                    .VehicleDifferentialSettings();
                 rearWheelDrive.mLeftWheel = BL_WHEEL;
                 rearWheelDrive.mRightWheel = BR_WHEEL;
                 rearWheelDrive.mLimitedSlipRatio = differentialLimitedSlipRatio;
@@ -1271,8 +1283,8 @@ class Game {
                         torqueSplitRatio;
 
                     // add front
-                    const frontWheelDrive =
-                        new this.Jolt.VehicleDifferentialSettings();
+                    const frontWheelDrive = new this.Jolt
+                        .VehicleDifferentialSettings();
                     frontWheelDrive.mLeftWheel = FL_WHEEL;
                     frontWheelDrive.mRightWheel = FR_WHEEL;
                     frontWheelDrive.mLimitedSlipRatio =
@@ -1335,11 +1347,11 @@ class Game {
                     this.Jolt.WheeledVehicleController,
                 );
                 this.vehicleEngine = this.playerController.GetEngine();
-                this.vehicleTransmission =
-                    this.playerController.GetTransmission();
+                this.vehicleTransmission = this.playerController
+                    .GetTransmission();
 
-                const controllerCallbacks =
-                    new this.Jolt.WheeledVehicleControllerCallbacksJS();
+                const controllerCallbacks = new this.Jolt
+                    .WheeledVehicleControllerCallbacksJS();
                 controllerCallbacks.OnTireMaxImpulseCallback = (
                     wheelIndex,
                     result,
@@ -1354,10 +1366,10 @@ class Game {
                         result,
                         this.Jolt.TireMaxImpulseCallbackResult,
                     );
-                    resultObj.mLongitudinalImpulse =
-                        longitudinalFriction * suspensionImpulse;
-                    resultObj.mLateralImpulse =
-                        lateralFriction * suspensionImpulse;
+                    resultObj.mLongitudinalImpulse = longitudinalFriction *
+                        suspensionImpulse;
+                    resultObj.mLateralImpulse = lateralFriction *
+                        suspensionImpulse;
                 };
                 controllerCallbacks.SetWheeledVehicleController(
                     this.playerController,
@@ -1374,10 +1386,8 @@ class Game {
                     let wheel;
                     if (isLeftSide) {
                         wheel = this.wheelGltfL.scene.clone();
-                        wheel.rotation.x = -Math.PI / 2;
                     } else {
                         wheel = this.wheelGltfR.scene.clone();
-                        wheel.rotation.x = Math.PI / 2;
                     }
 
                     body.add(wheel);
@@ -1403,8 +1413,8 @@ class Game {
                         updateLocalTransform: () => {
                             try {
                                 // wheel update
-                                const transform =
-                                    constraint.GetWheelLocalTransform(
+                                const transform = constraint
+                                    .GetWheelLocalTransform(
                                         wheelIndex,
                                         wheelRight,
                                         wheelUp,
@@ -1434,8 +1444,8 @@ class Game {
                                         .addVectors(wheelPos, cp)
                                         .multiplyScalar(0.5);
                                     const up = new THREE.Vector3(0, 1, 0);
-                                    const q =
-                                        new THREE.Quaternion().setFromUnitVectors(
+                                    const q = new THREE.Quaternion()
+                                        .setFromUnitVectors(
                                             up,
                                             dir.clone().normalize(),
                                         );
@@ -1467,10 +1477,11 @@ class Game {
                     this.vehicleWheels.push(updater);
                 }
 
-                const stepListener =
-                    new this.Jolt.VehicleConstraintStepListener(this.vehicle);
-                this.vehicleStepListener =
-                    this.physicsSystem.AddStepListener(stepListener);
+                const stepListener = new this.Jolt
+                    .VehicleConstraintStepListener(this.vehicle);
+                this.vehicleStepListener = this.physicsSystem.AddStepListener(
+                    stepListener,
+                );
 
                 console.log("Created vehicle with step listener");
                 return carBody;
@@ -1491,13 +1502,13 @@ class Game {
             this.lastActivityTime = Date.now();
         };
 
-        document.addEventListener('mousemove', () => {
+        document.addEventListener("mousemove", () => {
             if (this.controls) {
                 updateActivity();
             }
         });
 
-        document.addEventListener('click', () => {
+        document.addEventListener("click", () => {
             updateActivity();
         });
 
@@ -1511,7 +1522,6 @@ class Game {
             };
 
             this.input = input;
-
 
             const keyDownHandler = (event) => {
                 const keyCode = event.key;
@@ -1646,8 +1656,8 @@ class Game {
 
             this.currentRPM = this.vehicleEngine.GetCurrentRPM();
 
-            this.uiOverlay.querySelector("#rpm-value").textContent =
-                `${Math.round(this.currentRPM)} RPM`;
+            this.uiOverlay.querySelector("#rpm-value").textContent = `${Math.round(this.currentRPM)
+                } RPM`;
         } catch (error) {
             console.error("Failed to process prePhysicsUpdate:", error);
             this.setState(State.ERROR, error.message);
@@ -1737,6 +1747,36 @@ class Game {
         }
     }
 
+    async updateOtherPlayers(players) {
+        const seenIds = new Set();
+
+        for (const playerData of players) {
+            seenIds.add(playerData.player_id);
+
+            if (playerData.player_id === this.playerId) continue;
+
+            let remotePlayer = this.otherPlayers.get(playerData.player_id);
+            if (!remotePlayer) {
+                remotePlayer = new RemotePlayer(
+                    this,
+                    playerData,
+                    PACKET_INTERVAL,
+                    this.debugMode
+                );
+                this.otherPlayers.set(playerData.player_id, remotePlayer);
+            }
+
+            remotePlayer.updateState(playerData);
+        }
+
+        for (const [id, player] of this.otherPlayers) {
+            if (!seenIds.has(id)) {
+                player.remove();
+                this.otherPlayers.delete(id);
+            }
+        }
+    }
+
     animate() {
         requestAnimationFrame(this.animate.bind(this));
 
@@ -1751,6 +1791,11 @@ class Game {
             this.handleCamera();
 
             this.updateRpmGauge();
+
+            const currentTime = Date.now();
+            for (const remotePlayer of this.otherPlayers.values()) {
+                remotePlayer.predict(currentTime, deltaTime);
+            }
 
             if (this.controls) this.controls.update();
 
@@ -1767,7 +1812,6 @@ class Game {
             this.playerActive = false;
         }
     }
-
 
     // AI:n tekemä: Create a recursive function that creates a pyramid out of cubes with createbody function. Grok 3
     async createPyramid(
@@ -1899,9 +1943,9 @@ class Game {
             cleanup();
         });
         this.ws.addEventListener("message", async (event) => {
-            const buffer = event.data.arrayBuffer ?
-                await event.data.arrayBuffer() :
-                event.data;
+            const buffer = event.data.arrayBuffer
+                ? await event.data.arrayBuffer()
+                : event.data;
 
             const data = new Float64Array(buffer);
 
@@ -1919,28 +1963,22 @@ class Game {
                     position: {
                         x: data[baseIndex + 1],
                         y: data[baseIndex + 2],
-                        z: data[baseIndex + 3]
+                        z: data[baseIndex + 3],
                     },
                     rotation: {
                         x: data[baseIndex + 4],
                         y: data[baseIndex + 5],
                         z: data[baseIndex + 6],
-                        w: data[baseIndex + 7]
+                        w: data[baseIndex + 7],
                     },
                     velocity: {
                         x: data[baseIndex + 8],
                         y: data[baseIndex + 9],
-                        z: data[baseIndex + 10]
+                        z: data[baseIndex + 10],
                     },
-                    activity: data[baseIndex + 11]
+                    activity: data[baseIndex + 11],
                 };
                 players.push(player);
-            }
-
-            if (playerCount > 0) {
-                this.addDebugLog("info", `Received data for ${players.length} players:\n${JSON.stringify(players, null, 2)}`);
-            } else {
-                this.addDebugLog("info", "no other players data received")
             }
 
             this.updateOtherPlayers(players);
@@ -1982,7 +2020,7 @@ class Game {
                             position: this.playerPosition,
                             rotation: this.playerRotation,
                             velocity: this.playerVelocity,
-                            active: this.playerActive
+                            active: this.playerActive,
                         };
 
                         data = new Float64Array([
@@ -1997,15 +2035,11 @@ class Game {
                             this.playerVelocity.x,
                             this.playerVelocity.y,
                             this.playerVelocity.z,
-                            this.playerActive ? 1.0 : 0.0
+                            this.playerActive ? 1.0 : 0.0,
                         ]);
 
                         const packetStr = JSON.stringify(packet, null, 2);
 
-                        this.addDebugLog(
-                            "info",
-                            `CLIENT SENT: packet #${counter}\n${packetStr}`,
-                        );
                         try {
                             this.ws.send(data.buffer);
                         } catch (e) {
@@ -2022,7 +2056,7 @@ class Game {
                     );
                     cleanup();
                 }
-            }, 1000);
+            }, PACKET_INTERVAL);
         });
 
         this.ws.addEventListener("close", (event) => {
@@ -2202,7 +2236,6 @@ class Game {
         this.physicsSystem = null;
         this.joltInterface = null;
     }
-
 }
 
 document.addEventListener("DOMContentLoaded", () => {
