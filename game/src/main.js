@@ -61,9 +61,13 @@ export default class Game {
         this.RpmGaugeSvg = null;
         this.RpmGaugeNeedle = null;
 
+        this.showMenu = false;
+        this.toastMessages = [];
+        this.toastMessageContainer = null;
+
         this.debugLog = [];
         this.debugLogContainer = null;
-        this.debugMode = false;
+        this.debugMode = true;
 
         // player
         this.controls = null;
@@ -140,7 +144,7 @@ export default class Game {
                     <g id="tickMarks"></g>
                     <text x="100" y="180" text-anchor="middle" fill="#808080" font-size="18">RPM</text>
                     <text x="50" y="165" text-anchor="middle" fill="#808080" font-size="12">0</text>
-                    <text x="160" y="90" text-anchor="middle" fill="#808080" font-size="12">10000</text>
+                    <text x="160" y="90" text-anchor="middle" fill="#808080" font-size="12">8000</text>
                     <!-- Needle (starts vertical) -->
                     <line id="rpm-needle" x1="100" y1="100" x2="100" y2="35" stroke="#f00" stroke-width="4"/>
                     <circle cx="100" cy="100" r="6" fill="#fff"/>
@@ -166,7 +170,7 @@ export default class Game {
     // the svg layout looks like what i want now, can you add marker lines aftear each 1000rpm and add redline to end
     addTickMarks() {
         const tickContainer = document.getElementById("tickMarks");
-        const maxRPM = 10000;
+        const maxRPM = 9500;
         const minRPM = 0;
 
         const sweep = 230;
@@ -232,6 +236,68 @@ export default class Game {
             }
         }, ttl * 1000);
     }
+
+    addToastMessage(message, ttl = 10) {
+        this.toastMessages.push(message)
+        this.renderToastMessages();
+
+        setTimeout(() => {
+            const idx = this.toastMessages.indexOf(message);
+            if (idx !== -1) {
+                this.toastMessages.splice(idx, 1);
+                this.renderToastMessages();
+            }
+        }, ttl * 1000);
+
+    }
+
+    renderToastMessages() {
+
+        if (!this.toastMessageContainer) {
+            this.toastMessageContainer = document.createElement("div");
+            this.toastMessageContainer.className = "toast-log";
+            this.canvasContainer.appendChild(this.toastMessageContainer);
+        }
+        this.toastMessageContainer.innerHTML = this.toastMessages
+            .map(
+                (message) => `
+                <div>
+                    <span class="toast-log-entry">${message}</span>
+                </div>
+                `,
+            )
+            .join("");
+        this.toastMessageContainer.scrollTop = this.toastMessageContainer.scrollHeight;
+    }
+
+
+
+    composeMenu() {
+        this.addUiElement(`
+        <div class="game-pop">
+            <button class="close-pop" title="Close">&times;</button>
+            <h1>Game menu</h1>
+            <input type="checkbox" id="debug-toggle">
+            <label for="debug-toggle">debug mode</label>
+        </div>
+    `);
+
+        const debugCheckbox = menuElement.querySelector('#debug-toggle');
+
+        debugCheckbox.checked = this.debugMode;
+
+        debugCheckbox.addEventListener('change', (event) => {
+            this.debugMode = event.target.checked;
+            this.addDebugLog("info", `Debug mode ${this.debugMode ? 'enabled' : 'disabled'}`, 3);
+        });
+
+        const closeButton = menuElement.querySelector('.close-pop');
+        closeButton.addEventListener('click', () => {
+            // menuElement.style.display = 'none';
+        });
+
+    }
+
 
     addUiElement(htmlOrNode, ttl = null) {
         let node;
@@ -335,10 +401,15 @@ export default class Game {
     setNetworkState(state) {
         this.showNetworkIcon();
         let color = "#808080";
-        if (state === NetworkState.CONNECTING) color = "#edc001";
-        if (state === NetworkState.CONNECTED) color = "#0b6623";
-        if (state === NetworkState.DISCONNECTED) color = "#ed4337";
-        this.networkIcon.style.backgroundColor = color;
+        if (state === NetworkState.CONNECTING) {
+            color = "#edc001";
+        } else if (state === NetworkState.CONNECTED) {
+            color = "#0b6623";
+        } else if (state === NetworkState.DISCONNECTED) {
+            color = "#ed4337";
+        }
+
+        document.documentElement.style.setProperty('--network-status-color', color);
     }
 
     setState(newState, errorMessage) {
@@ -1519,6 +1590,7 @@ export default class Game {
                 leftPressed: false,
                 rightPressed: false,
                 handBrake: false,
+                menuPressed: false
             };
 
             this.input = input;
@@ -1536,7 +1608,11 @@ export default class Game {
                     input.rightPressed = true;
                 } else if (keyCode == "z" || keyCode == " ") {
                     input.handBrake = true;
+                } else if (keyCode == "Escape") {
                 }
+
+
+
             };
 
             const keyUpHandler = (event) => {
@@ -1551,7 +1627,11 @@ export default class Game {
                     input.rightPressed = false;
                 } else if (keyCode == "z" || keyCode == " ") {
                     input.handBrake = false;
+                } else if (keyCode == "Escape") {
+                    this.showMenu = !this.showMenu
                 }
+
+
             };
 
             document.addEventListener("keydown", keyDownHandler, false);
@@ -2141,14 +2221,14 @@ export default class Game {
             this.setState(State.READY);
             this.animate();
 
-            this.addUiElement(
-                `<div class="game-hint">
-                    <span>WASD: Drive</span><br>
-                    <span>Space: Handbrake</span>
-                    <!-- add more hints -->
-                </div>`,
-                10,
-            );
+            setTimeout(() => {
+                this.addToastMessage("Use WASD to drive");
+            }, 2000);
+
+            setTimeout(() => {
+                this.addToastMessage("Use Spacebar for handbrake");
+            }, 4000);
+
             // this.addUiElement(`
             //      <div class="game-pop">
             //        <button class="close-pop" title="Close">&times;</button>
