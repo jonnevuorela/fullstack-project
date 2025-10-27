@@ -2239,12 +2239,7 @@ export default class Game {
     websocketConnect() {
         //  this.setState(State.LOADING);
         this.setNetworkState(NetworkState.CONNECTING);
-        let wsUrl;
-        if (window.location.hostname === 'localhost' || window.location.hostname === '0.0.0.0' || window.location.hostname === '127.0.0.1') {
-            wsUrl = `wss://${window.location.host}/ws`;
-        } else {
-            wsUrl = `wss://ws.game.jonnevuorela.com/ws`;
-        }
+        const wsUrl = `wss://${window.location.host}/ws`;
         this.ws = new WebSocket(wsUrl);
         if (!this.ws) {
             throw new Error("WebSocket creation failed");
