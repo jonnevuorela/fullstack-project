@@ -73,7 +73,7 @@ func secureHeaders(next http.Handler) http.Handler {
 				"script-src 'self' 'nonce-"+nonce+"' 'wasm-unsafe-eval'; "+
 				"style-src 'self' https://fonts.googleapis.com 'unsafe-inline'; "+
 				"font-src https://fonts.gstatic.com; "+
-				"connect-src 'self' wss://localhost:4000 blob:; "+
+				"connect-src 'self' wss://localhost:443 wss://ws.game.jonnevuorela.com blob:; "+
 				"object-src 'none'; "+
 				"base-uri 'self'; "+
 				"frame-src 'none'; "+
