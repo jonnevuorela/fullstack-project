@@ -1865,7 +1865,7 @@ export default class Game {
                 } else if (keyCode == "z" || keyCode == " ") {
                     input.handBrake = false;
                 } else if (keyCode == "Escape") {
-                    this.showMenu = !this.showMenu
+                    this.debugMode = !this.debugMode
                 }
 
 
