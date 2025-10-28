@@ -1,0 +1,234 @@
+/* Touch controllit ja mobiili responsiivisuus pelille generoitu AI:lla. Claude Sonnet 3.5
+/* Touch Controls and Mobile Styles */
+.touch-controls {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 1000;
+    will-change: transform;
+}
+
+.touch-joystick {
+    position: fixed;
+    bottom: 40px;
+    left: 40px;
+    width: 120px;
+    height: 120px;
+    background: rgba(255, 255, 255, 0.2);
+    border: 2px solid rgba(255, 255, 255, 0.4);
+    border-radius: 50%;
+    pointer-events: auto;
+    touch-action: none;
+    will-change: transform;
+    z-index: 1001;
+}
+
+.touch-joystick-thumb {
+    position: absolute;
+    width: 60px;
+    height: 60px;
+    background: rgba(255, 255, 255, 0.5);
+    border-radius: 50%;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    -webkit-transition: transform 0.1s ease-out;
+    transition: transform 0.1s ease-out;
+}
+
+.touch-buttons {
+    position: fixed;
+    bottom: 32px;
+    right: 32px;
+    display: grid;
+    grid-template-areas:
+        ". . b"
+        "h . a";
+    gap: 60px;
+    pointer-events: auto;
+    z-index: 1001;
+}
+
+
+.touch-button {
+    width: 32px;
+    height: 32px;
+    background: rgba(0, 0, 0, 0.5);
+    border: 2px solid rgba(255, 255, 255, 0.4);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: bold;
+    font-size: 24px;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    will-change: transform;
+}
+
+.touch-accelerate {
+    grid-area: a;
+    background: rgba(0, 200, 0, 0.2);
+}
+
+.touch-brake {
+    grid-area: b;
+    background: rgba(200, 0, 0, 0.2);
+}
+
+.touch-handbrake {
+    grid-area: h;
+    background: rgba(200, 110, 0, 0.2);
+}
+
+.touch-button:active,
+.touch-buttons>div.active {
+    transform: scale(0.8);
+    opacity: 0.8;
+    background-color: rgba(255, 255, 255, 0.8);
+}
+
+/* Mobile Specific Styles */
+@media screen and (max-width: 768px) {
+   .rpm-meter {
+        width: 64px;
+        height: 64px;
+        bottom: 15px;
+        right: 15px;
+    }
+
+    #rpm-value {
+        font-size: 12px !important;
+    }
+
+    .touch-buttons {
+        gap: 10px;
+    }
+
+    .touch-button {
+        width: 55px;
+        height: 55px;
+        font-size: 18px;
+    }
+}
+
+/* Portrait Mode */
+@media screen and (max-width: 768px) and (orientation: portrait) {
+    .game-container {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        width: 100vw;
+        height: 100vh;
+        transform: rotate(90deg);
+        transform-origin: bottom left;
+        background: #000;
+    }
+
+    #gameCanvas {
+        width: 100vh !important;
+        height: 100vw !important;
+        transform-origin: top left;
+        position: absolute;
+        top: 0;
+        left: 0;
+    }
+
+    .touch-controls {
+        transform: rotate(90deg);
+        transform-origin: bottom left;
+    }
+
+    .game-ui,
+    .rpm-meter,
+    .network-status-icon,
+    .debug-log,
+    .toast-log {
+        transform: rotate(-90deg);
+        transform-origin: bottom right;
+    }
+
+    .touch-buttons {
+        transform: rotate(-90deg);
+        transform-origin: bottom right;
+        right: 20vw;
+        bottom: 40vh;
+    }
+
+    .touch-joystick {
+        transform: rotate(-90deg);
+        transform-origin: bottom left;
+        left: 20vw;
+        bottom: 40vh;
+    }
+
+    .touch-button {
+        transform: rotate(-90deg);
+    }
+
+    .rpm-meter {
+        transform: rotate(-90deg);
+        transform-origin: bottom right;
+        width: 64px;
+        height: 64px;
+        bottom: 10%;
+        right: 10%;
+    }
+
+    .network-status-icon {
+        top: 5vh;
+        right: 5vw;
+    }
+
+    .debug-log {
+        top: 10vh;
+        left: 5vw;
+        max-width: 80vw;
+    }
+
+    .toast-log {
+        top: 10vh;
+        right: 5vw;
+        max-width: 80vw;
+    }
+}
+
+/* Coarse Pointer Devices */
+@media (hover: none) and (pointer: coarse) {
+    * {
+        -webkit-touch-callout: none;
+        -webkit-user-select: none;
+        user-select: none;
+    }
+}
+
+/* Orientation Message */
+.orientation-message {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.9);
+    color: white;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    z-index: 2000;
+    padding: 20px;
+}
+
+@media screen and (max-width: 768px) and (orientation: portrait) {
+    .orientation-message {
+        display: flex;
+    }
+}

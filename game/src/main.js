@@ -9,6 +9,7 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import initJolt from "jolt-physics";
 
 import RemotePlayer from "./remotePlayer.js";
+import TouchController from "./touchController.js";
 
 const LAYER_NON_MOVING = 0;
 const LAYER_MOVING = 1;
@@ -54,6 +55,7 @@ export default class Game {
         this.state = State.LOADING;
         this.overlay = null;
         this.overlayContent = null;
+        this.isMobile = false;
         this.canvasContainer = document.getElementById("gameCanvas");
         this.uiOverlay = document.getElementById("gameUi");
         this.uiDynamicContainer = null;
@@ -67,7 +69,7 @@ export default class Game {
 
         this.debugLog = [];
         this.debugLogContainer = null;
-        this.debugMode = true;
+        this.debugMode = false;
 
         // audio
         this.listener = null;
@@ -149,7 +151,7 @@ export default class Game {
             // how could we make a svg that simulates a rpm gauge that edits with the rpm value of the game with the addUiElement function
             this.uiOverlay.innerHTML = `
                 <div class="rpm-meter">
-                    <svg id="rpm-gauge" width="200" height="200" viewBox="0 0 200 200">
+                    <svg id="rpm-gauge"  viewBox="0 0 200 200">
                     <circle cx="100" cy="100" r="95" fill="#222" stroke="#444" stroke-width="2"/>
                     <g id="tickMarks"></g>
                     <text x="100" y="180" text-anchor="middle" fill="#808080" font-size="18">RPM</text>
@@ -368,6 +370,7 @@ export default class Game {
         }
     }
 
+
     showSpinner() {
         this.showSpinnerOverlay();
     }
@@ -448,6 +451,49 @@ export default class Game {
         } else if (newState === State.READY) {
             this.hideSpinner();
             this.clearError();
+        }
+    }
+
+    handleMobileOrientation() {
+        this.isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+        if (this.isMobile) {
+            if (screen.orientation && screen.orientation.lock) {
+                screen.orientation.lock('landscape')
+                    .catch(err => this.addDebugLog("info", "Orientation lock failed: " + err));
+            }
+
+            if (!document.querySelector('.orientation-message')) {
+                const message = document.createElement('div');
+                message.className = 'orientation-message';
+                message.innerHTML = `
+                <div>
+                    <h2>Please rotate your device</h2>
+                    <p>This game is best played in landscape mode</p>
+                </div>
+            `;
+                document.body.appendChild(message);
+            }
+
+            window.addEventListener('orientationchange', () => {
+                this.handleResize();
+            });
+        }
+    }
+
+    handleResize() {
+        this.isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+        if (this.isMobile) {
+            const width = window.innerHeight;
+            const height = window.innerWidth;
+            this.camera.aspect = width / height;
+            this.camera.updateProjectionMatrix();
+            this.renderer.setSize(width, height, true);
+        } else {
+            const width = window.innerWidth * 0.9;
+            const height = window.innerHeight * 0.9;
+            this.camera.aspect = width / height;
+            this.camera.updateProjectionMatrix();
+            this.renderer.setSize(width, height, true);
         }
     }
 
@@ -555,6 +601,13 @@ export default class Game {
         this.setState(State.LOADING);
         console.log("Initializing Three.js scene");
         try {
+
+            this.handleMobileOrientation();
+
+            window.addEventListener("resize", () => {
+                this.handleResize();
+            });
+
             this.scene = new THREE.Scene();
             this.scene.background = new THREE.Color(0xffd577);
 
@@ -1885,6 +1938,10 @@ export default class Game {
             this.controls.maxDistance = 12;
             this.controls.maxPolarAngle = Math.PI / 2;
             this.controls.minPolarAngle = 0.1;
+
+
+            this.touchController = new TouchController(this, this.canvasContainer);
+
         } catch (error) {
             console.error("Failed to set up controls:", error);
             this.setState(State.ERROR, error.message);
@@ -2240,6 +2297,7 @@ export default class Game {
         //  this.setState(State.LOADING);
         this.setNetworkState(NetworkState.CONNECTING);
         const wsUrl = `wss://${window.location.host}/ws`;
+        console.log(wsUrl);
         this.ws = new WebSocket(wsUrl);
         if (!this.ws) {
             throw new Error("WebSocket creation failed");
@@ -2465,11 +2523,19 @@ export default class Game {
             this.animate();
 
             setTimeout(() => {
-                this.addToastMessage("Use WASD to drive");
+                if (!this.isMobile) {
+                    this.addToastMessage("Use WASD to drive.");
+                } else {
+                    this.addToastMessage("Use the Joystick to steer.")
+                }
             }, 2000);
 
             setTimeout(() => {
-                this.addToastMessage("Use Spacebar for handbrake");
+                if (!this.isMobile) {
+                    this.addToastMessage("Use Spacebar for handbrake.");
+                } else {
+                    this.addToastMessage("Use a for acceleration, b for braking and h for handbrake.")
+                }
             }, 4000);
 
             // this.addUiElement(`
