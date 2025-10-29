@@ -10,6 +10,7 @@ import initJolt from "jolt-physics";
 
 import RemotePlayer from "./remotePlayer.js";
 import TouchController from "./touchController.js";
+import UIManager from "./uiManager.js";
 
 const LAYER_NON_MOVING = 0;
 const LAYER_MOVING = 1;
@@ -52,24 +53,11 @@ export default class Game {
         this.staticObjects = [];
 
         // ui
-        this.state = State.LOADING;
-        this.overlay = null;
-        this.overlayContent = null;
-        this.isMobile = false;
         this.canvasContainer = document.getElementById("gameCanvas");
-        this.uiOverlay = document.getElementById("gameUi");
-        this.uiDynamicContainer = null;
+        this.isMobile = false;
+        this.uiManager = null;
+        this.debugMode = true;
         this.currentRPM = 0;
-        this.RpmGaugeSvg = null;
-        this.RpmGaugeNeedle = null;
-
-        this.showMenu = false;
-        this.toastMessages = [];
-        this.toastMessageContainer = null;
-
-        this.debugLog = [];
-        this.debugLogContainer = null;
-        this.debugMode = false;
 
         // audio
         this.listener = null;
@@ -111,10 +99,13 @@ export default class Game {
         this.groundMesh = null;
         this.mapColors = [0x666666, 0x006600, 0x000066];
 
+        // network
         this.ws = null;
         this.sendInterval = null;
         this.networkState = null;
         this.networkIcon = document.documentElement;
+        this.latencyElement = document.documentElement;
+        this.latency = 0;
     }
 
     degreesToRadians(degrees) {
@@ -134,332 +125,12 @@ export default class Game {
         );
     }
 
-    initOverlay() {
-        if (!this.overlay) {
-            this.overlay = document.createElement("div");
-            this.overlay.className = "game-overlay";
-            this.overlayContent = document.createElement("div");
-            this.overlayContent.className = "overlay-content";
-            this.overlay.appendChild(this.overlayContent);
-            this.canvasContainer.appendChild(this.overlay);
-        }
-        if (!this.uiOverlay) {
-            this.uiOverlay = document.createElement("div");
-            this.uiOverlay.className = "game-ui";
-
-            // AI genereoitu svg - locaali qwen3-coder-30b
-            // how could we make a svg that simulates a rpm gauge that edits with the rpm value of the game with the addUiElement function
-            this.uiOverlay.innerHTML = `
-                <div class="rpm-meter">
-                    <svg id="rpm-gauge"  viewBox="0 0 200 200">
-                    <circle cx="100" cy="100" r="95" fill="#222" stroke="#444" stroke-width="2"/>
-                    <g id="tickMarks"></g>
-                    <text x="100" y="180" text-anchor="middle" fill="#808080" font-size="18">RPM</text>
-                    <text x="50" y="165" text-anchor="middle" fill="#808080" font-size="12">0</text>
-                    <text x="160" y="90" text-anchor="middle" fill="#808080" font-size="12">8000</text>
-                    <!-- Needle (starts vertical) -->
-                    <line id="rpm-needle" x1="100" y1="100" x2="100" y2="35" stroke="#f00" stroke-width="4"/>
-                    <circle cx="100" cy="100" r="6" fill="#fff"/>
-                    </svg>
-                    <div id="rpm-value" style="text-align:center;font-size:16px;color:#fff;margin-top:6px;">0 RPM</div>
-                </div>
-                <div class="network-status-icon"></div>
-                <div id="ui-dynamic"></div>
-            `;
-            this.canvasContainer.appendChild(this.uiOverlay);
-
-            this.addTickMarks();
-            // Keep reference for adding elements later
-            this.uiDynamicContainer = this.uiOverlay.querySelector(
-                "#ui-dynamic",
-            );
-            this.RpmGaugeSvg = this.uiOverlay.querySelector("#rpm-gauge");
-            this.RpmGaugeNeedle = this.uiOverlay.querySelector("#rpm-needle");
-            this.RpmGaugeValue = this.uiOverlay.querySelector("#rpm-value");
-        }
-    }
-    // AI genereoitu svg - locaali qwen3-coder-30b
-    // the svg layout looks like what i want now, can you add marker lines aftear each 1000rpm and add redline to end
-    addTickMarks() {
-        const tickContainer = document.getElementById("tickMarks");
-        const maxRPM = 9500;
-        const minRPM = 0;
-
-        const sweep = 230;
-        const base = -235;
-
-        for (let i = 0; i <= maxRPM; i += 1000) {
-            // Angle for this tick
-            const angle = ((i - minRPM) / (maxRPM - minRPM)) * sweep;
-            const theta = angle + base; // actual angle for this tick mark
-
-            const x1 = 100 + 85 * Math.cos((theta * Math.PI) / 180);
-            const y1 = 100 + 85 * Math.sin((theta * Math.PI) / 180);
-            const x2 = 100 + 95 * Math.cos((theta * Math.PI) / 180);
-            const y2 = 100 + 95 * Math.sin((theta * Math.PI) / 180);
-
-            const line = document.createElementNS(
-                "http://www.w3.org/2000/svg",
-                "line",
-            );
-            line.setAttribute("x1", x1);
-            line.setAttribute("y1", y1);
-            line.setAttribute("x2", x2);
-            line.setAttribute("y2", y2);
-            line.setAttribute("stroke", "#fff");
-            line.setAttribute("stroke-width", "2");
-            tickContainer.appendChild(line);
-        }
-
-        // Redline at maxRPM
-        const angle = sweep + base;
-        const rx1 = 100 + 85 * Math.cos((angle * Math.PI) / 180);
-        const ry1 = 100 + 85 * Math.sin((angle * Math.PI) / 180);
-        const rx2 = 100 + 95 * Math.cos((angle * Math.PI) / 180);
-        const ry2 = 100 + 95 * Math.sin((angle * Math.PI) / 180);
-
-        const redline = document.createElementNS(
-            "http://www.w3.org/2000/svg",
-            "line",
-        );
-        redline.setAttribute("x1", rx1);
-        redline.setAttribute("y1", ry1);
-        redline.setAttribute("x2", rx2);
-        redline.setAttribute("y2", ry2);
-        redline.setAttribute("stroke", "red");
-        redline.setAttribute("stroke-width", "3");
-        tickContainer.appendChild(redline);
-    }
-
-    addDebugLog(type, text, ttl = 5) {
-        const now = new Date();
-        const timeStr = now.toLocaleTimeString("en-US", { hour12: false });
-        const entry = { type, text, time: timeStr, ttl };
-
-        this.debugLog.push(entry);
-        this.renderDebugLog();
-        console.log(`${type}: ${text}`);
-
-        setTimeout(() => {
-            const idx = this.debugLog.indexOf(entry);
-            if (idx !== -1) {
-                this.debugLog.splice(idx, 1);
-                this.renderDebugLog();
-            }
-        }, ttl * 1000);
-    }
-
-    addToastMessage(message, ttl = 10) {
-        this.toastMessages.push(message)
-        this.renderToastMessages();
-
-        const sound = this.audioGloabal
-        if (this.soundEffects.toast) {
-            sound.setBuffer(this.soundEffects.toast);
-            sound.setLoop(false);
-            sound.setVolume(0.5);
-            sound.play();
-
-        }
-        setTimeout(() => {
-            const idx = this.toastMessages.indexOf(message);
-            if (idx !== -1) {
-                this.toastMessages.splice(idx, 1);
-                this.renderToastMessages();
-            }
-        }, ttl * 1000);
-
-    }
-
-    renderToastMessages() {
-
-        if (!this.toastMessageContainer) {
-            this.toastMessageContainer = document.createElement("div");
-            this.toastMessageContainer.className = "toast-log";
-            this.canvasContainer.appendChild(this.toastMessageContainer);
-        }
-        this.toastMessageContainer.innerHTML = this.toastMessages
-            .map(
-                (message) => `
-                <div>
-                    <span class="toast-log-entry">${message}</span>
-                </div>
-                `,
-            )
-            .join("");
-        this.toastMessageContainer.scrollTop = this.toastMessageContainer.scrollHeight;
-    }
-
-
-
-    composeMenu() {
-        this.addUiElement(`
-        <div class="game-pop">
-            <button class="close-pop" title="Close">&times;</button>
-            <h1>Game menu</h1>
-            <input type="checkbox" id="debug-toggle">
-            <label for="debug-toggle">debug mode</label>
-        </div>
-    `);
-
-        const debugCheckbox = menuElement.querySelector('#debug-toggle');
-
-        debugCheckbox.checked = this.debugMode;
-
-        debugCheckbox.addEventListener('change', (event) => {
-            this.debugMode = event.target.checked;
-            this.addDebugLog("info", `Debug mode ${this.debugMode ? 'enabled' : 'disabled'}`, 3);
-        });
-
-        const closeButton = menuElement.querySelector('.close-pop');
-        closeButton.addEventListener('click', () => {
-            // menuElement.style.display = 'none';
-        });
-
-    }
-
-
-    addUiElement(htmlOrNode, ttl = null) {
-        let node;
-        if (typeof htmlOrNode === "string") {
-            node = document.createElement("div");
-            node.innerHTML = htmlOrNode;
-            node = node.firstElementChild || node;
-        } else {
-            node = htmlOrNode;
-        }
-
-        const closeBtn = node.querySelector(".close-pop");
-        if (closeBtn) {
-            closeBtn.onclick = () => {
-                if (node.parentNode) node.parentNode.removeChild(node);
-            };
-        }
-
-        this.uiDynamicContainer.appendChild(node);
-
-        if (ttl && typeof ttl === "number" && ttl > 0) {
-            setTimeout(() => {
-                if (node.parentNode === this.uiDynamicContainer) {
-                    this.uiDynamicContainer.removeChild(node);
-                }
-            }, ttl * 1000);
-        }
-        return node;
-    }
-
-    renderDebugLog() {
-        if (this.debugMode) {
-
-            if (!this.debugLogContainer) {
-                this.debugLogContainer = document.createElement("div");
-                this.debugLogContainer.className = "debug-log";
-                this.canvasContainer.appendChild(this.debugLogContainer);
-            }
-            this.debugLogContainer.innerHTML = this.debugLog
-                .map(
-                    (entry) => `
-                <div class="debug-log-entry debug-${entry.type}">
-                    <span class="debug-time">${entry.time}</span>
-                    <span class="debug-text">${entry.text}</span>
-                </div>
-                `,
-                )
-                .join("");
-            this.debugLogContainer.scrollTop = this.debugLogContainer.scrollHeight;
-        }
-    }
-
-
-    showSpinner() {
-        this.showSpinnerOverlay();
-    }
-
-    showSpinnerOverlay() {
-        if (!this.spinnerOverlay) {
-            this.spinnerOverlay = document.createElement("div");
-            this.spinnerOverlay.className = "spinner-overlay";
-            const spinner = document.createElement("div");
-            spinner.className = "spinner";
-            this.spinnerOverlay.appendChild(spinner);
-            this.canvasContainer.appendChild(this.spinnerOverlay);
-        }
-    }
-
-    hideSpinner() {
-        this.hideSpinnerOverlay();
-    }
-
-    hideSpinnerOverlay() {
-        if (this.spinnerOverlay) {
-            this.spinnerOverlay.remove();
-            this.spinnerOverlay = null;
-        }
-    }
-
-    showError(message) {
-        this.initOverlay();
-        this.overlayContent.innerHTML = `<div class="overlay-error">${message || "An error occurred."
-            }</div>`;
-    }
-
-    clearError() {
-        this.initOverlay();
-        this.overlayContent.innerHTML = "";
-    }
-
-    showNetworkIcon() {
-        this.initOverlay();
-        let icon = this.overlayContent.querySelector(".network-icon");
-        if (!icon) {
-            icon = document.createElement("div");
-            icon.className = "network-icon";
-            this.overlayContent.appendChild(icon);
-        }
-        this.networkIcon = icon;
-    }
-
-    setNetworkState(state) {
-        this.showNetworkIcon();
-        let color = "#808080";
-        if (state === NetworkState.CONNECTING) {
-            color = "#edc001";
-        } else if (state === NetworkState.CONNECTED) {
-            color = "#0b6623";
-        } else if (state === NetworkState.DISCONNECTED) {
-            color = "#ed4337";
-        }
-
-        document.documentElement.style.setProperty('--network-status-color', color);
-    }
-
-    setState(newState, errorMessage) {
-        this.initOverlay();
-        if (newState === State.LOADING) {
-            this.showSpinner();
-            this.clearError();
-        } else if (newState === State.ERROR) {
-            this.hideSpinner();
-            this.showError(errorMessage);
-            let logMsg = "";
-            if (errorMessage instanceof Error) {
-                logMsg = errorMessage.message;
-            } else {
-                logMsg = errorMessage || "An error occurred.";
-            }
-            this.addDebugLog("error", logMsg);
-        } else if (newState === State.READY) {
-            this.hideSpinner();
-            this.clearError();
-        }
-    }
-
     handleMobileOrientation() {
         this.isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
         if (this.isMobile) {
             if (screen.orientation && screen.orientation.lock) {
                 screen.orientation.lock('landscape')
-                    .catch(err => this.addDebugLog("info", "Orientation lock failed: " + err));
+                    .catch(err => this.uiManager.addDebugLog("info", "Orientation lock failed: " + err));
             }
 
             if (!document.querySelector('.orientation-message')) {
@@ -469,6 +140,8 @@ export default class Game {
                 <div>
                     <h2>Please rotate your device</h2>
                     <p>This game is best played in landscape mode</p>
+                    <br>
+                    <a href=/>Back to home page.</a>
                 </div>
             `;
                 document.body.appendChild(message);
@@ -529,7 +202,7 @@ export default class Game {
     }
 
     async initPhysics() {
-        this.setState(State.LOADING);
+        this.uiManager.setState(State.LOADING);
         console.log("Starting Jolt initialization");
         try {
             this.Jolt = await initJolt({
@@ -592,13 +265,13 @@ export default class Game {
             console.log("Physics system initialized");
         } catch (error) {
             console.error("Failed to initialize physics:", error);
-            this.setState(State.ERROR, error.message);
+            this.uiManager.setState(State.ERROR, error.message);
             throw error;
         }
     }
 
     initScene() {
-        this.setState(State.LOADING);
+        this.uiManager.setState(State.LOADING);
         console.log("Initializing Three.js scene");
         try {
 
@@ -657,7 +330,7 @@ export default class Game {
 
         } catch (error) {
             console.error("Failed to initialize scene:", error);
-            this.setState(State.ERROR, error.message);
+            this.uiManager.setState(State.ERROR, error.message);
             throw error;
         }
     }
@@ -873,13 +546,13 @@ export default class Game {
             return geometry;
         } catch (error) {
             console.error("Failed to create mesh for shape:", error);
-            this.setState(State.ERROR, error.message);
+            this.uiManager.setState(State.ERROR, error.message);
             throw error;
         }
     }
 
     createGround() {
-        this.setState(State.LOADING);
+        this.uiManager.setState(State.LOADING);
         console.log("Creating ground");
         try {
             this.tempRVec.Set(0, -0.3, 0);
@@ -904,7 +577,7 @@ export default class Game {
             return groundBody;
         } catch (error) {
             console.error("Failed to create ground:", error);
-            this.setState(State.ERROR, error.message);
+            this.uiManager.setState(State.ERROR, error.message);
             throw error;
         }
     }
@@ -1007,7 +680,7 @@ export default class Game {
     }
 
     async createMap() {
-        this.setState(State.LOADING);
+        this.uiManager.setState(State.LOADING);
         console.log("Creating map");
         try {
             const mapGltf = await this.gltfLoader.loadAsync(
@@ -1024,7 +697,7 @@ export default class Game {
             );
             if (!triangleList) {
                 console.error("Failed to create TriangleList from road model");
-                this.setState(
+                this.uiManager.setState(
                     State.ERROR,
                     "Failed to create physics shape for road",
                 );
@@ -1053,16 +726,16 @@ export default class Game {
             this.Jolt.destroy(triangleList);
             this.Jolt.destroy(mapShapeSettings);
 
-            this.setState(State.READY);
+            this.uiManager.setState(State.READY);
             return mapGltf;
         } catch (error) {
-            this.setState(State.ERROR, `Map creation error: ${error.message}`);
+            this.uiManager.setState(State.ERROR, `Map creation error: ${error.message}`);
             throw error;
         }
     }
 
     async createRoads() {
-        this.setState(State.LOADING);
+        this.uiManager.setState(State.LOADING);
         console.log("Creating roads");
         try {
             const roadsGltf = await this.gltfLoader.loadAsync(
@@ -1078,8 +751,7 @@ export default class Game {
                 roadsModel,
             );
             if (!triangleList) {
-                console.error("Failed to create TriangleList from roads model");
-                this.setState(
+                this.uiManager.setState(
                     State.ERROR,
                     "Failed to create physics shape for roads",
                 );
@@ -1108,10 +780,10 @@ export default class Game {
             this.Jolt.destroy(triangleList);
             this.Jolt.destroy(roadsShapeSettings);
 
-            this.setState(State.READY);
+            this.uiManager.setState(State.READY);
             return roadsGltf;
         } catch (error) {
-            this.setState(
+            this.uiManager.setState(
                 State.ERROR,
                 `Roads creation error: ${error.message}`,
             );
@@ -1302,7 +974,7 @@ export default class Game {
     }
 
     createVehicle() {
-        this.setState(State.LOADING);
+        this.uiManager.setState(State.LOADING);
 
         // dimensions
         const wheelRadius = 0.55;
@@ -1729,7 +1401,7 @@ export default class Game {
                         }
 
                     } catch (error) {
-                        this.addDebugLog("error", `Error in tire sound processing: ${error}`);
+                        this.uiManager.addDebugLog("error", `Error in tire sound processing: ${error}`);
                     }
                 };
                 controllerCallbacks.SetWheeledVehicleController(
@@ -1819,7 +1491,7 @@ export default class Game {
                                     );
                                 }
                             } catch (err) {
-                                this.addDebugLog("error", err);
+                                this.uiManager.addDebugLog("error", err);
                             }
                         },
                     };
@@ -1844,19 +1516,16 @@ export default class Game {
                     stepListener,
                 );
 
-                console.log("Created vehicle with step listener");
                 return carBody;
             });
         } catch (error) {
-            console.error("Failed to create vehicle:", error);
-            this.setState(State.ERROR, error.message);
+            this.uiManager.setState(State.ERROR, error.message);
             throw error;
         }
     }
 
     setupControls() {
-        this.setState(State.LOADING);
-        console.log("Setting up controls");
+        this.uiManager.setState(State.LOADING);
 
         const updateActivity = () => {
             this.playerActive = true;
@@ -1943,8 +1612,7 @@ export default class Game {
             this.touchController = new TouchController(this, this.canvasContainer);
 
         } catch (error) {
-            console.error("Failed to set up controls:", error);
-            this.setState(State.ERROR, error.message);
+            this.uiManager.setState(State.ERROR, error.message);
             throw error;
         }
     }
@@ -2030,11 +1698,10 @@ export default class Game {
 
             this.currentRPM = this.vehicleEngine.GetCurrentRPM();
 
-            this.uiOverlay.querySelector("#rpm-value").textContent = `${Math.round(this.currentRPM)
-                } RPM`;
+            const maxRPM = this.vehicleEngine.get_mMaxRPM();
+            this.uiManager.updateRpmGauge(this.currentRPM, maxRPM);
         } catch (error) {
-            console.error("Failed to process prePhysicsUpdate:", error);
-            this.setState(State.ERROR, error.message);
+            this.uiManager.setState(State.ERROR, error.message);
         }
     }
 
@@ -2168,15 +1835,14 @@ export default class Game {
 
             const currentTime = Date.now();
             for (const remotePlayer of this.otherPlayers.values()) {
-                remotePlayer.predict(currentTime, deltaTime);
+                remotePlayer.predict(currentTime, deltaTime, this.latency);
             }
 
             if (this.controls) this.controls.update();
 
             this.renderer.render(this.scene, this.camera);
         } catch (error) {
-            console.error("Animation error:", error);
-            this.setState(State.ERROR, `Animation error: ${error.message}`);
+            this.uiManager.setState(State.ERROR, `Animation error: ${error.message}`);
         }
     }
 
@@ -2294,8 +1960,8 @@ export default class Game {
     }
 
     websocketConnect() {
-        //  this.setState(State.LOADING);
-        this.setNetworkState(NetworkState.CONNECTING);
+        //  this.uiManager.setState(State.LOADING);
+        this.uiManager.updateNetworkStatus(NetworkState.CONNECTING, this.latency);
         const wsUrl = `wss://${window.location.host}/ws`;
         console.log(wsUrl);
         this.ws = new WebSocket(wsUrl);
@@ -2313,11 +1979,11 @@ export default class Game {
         };
 
         this.ws.addEventListener("error", (error) => {
-            console.error("WebSocket error:", error);
-            this.setState(State.ERROR, error);
-            this.setNetworkState(NetworkState.DISCONNECTED);
+            this.uiManager.setState(State.ERROR, error);
+            this.uiManager.updateNetworkStatus(NetworkState.DISCONNECTED, this.latency);
             cleanup();
         });
+
         this.ws.addEventListener("message", async (event) => {
             const buffer = event.data.arrayBuffer
                 ? await event.data.arrayBuffer()
@@ -2325,45 +1991,51 @@ export default class Game {
 
             const data = new Float64Array(buffer);
 
-            console.log("Received data length:", data.length);
-
             const valuesPerPlayer = 12;
             const playerCount = data.length / valuesPerPlayer;
 
             const players = [];
 
-            for (let i = 0; i < playerCount; i++) {
-                const baseIndex = i * valuesPerPlayer;
-                const player = {
-                    player_id: data[baseIndex],
-                    position: {
-                        x: data[baseIndex + 1],
-                        y: data[baseIndex + 2],
-                        z: data[baseIndex + 3],
-                    },
-                    rotation: {
-                        x: data[baseIndex + 4],
-                        y: data[baseIndex + 5],
-                        z: data[baseIndex + 6],
-                        w: data[baseIndex + 7],
-                    },
-                    velocity: {
-                        x: data[baseIndex + 8],
-                        y: data[baseIndex + 9],
-                        z: data[baseIndex + 10],
-                    },
-                    activity: data[baseIndex + 11],
-                };
-                players.push(player);
-            }
+            const serverTimestamp = data[0];
+            this.latency = Date.now() - serverTimestamp;
+            this.uiManager.addDebugLog("info", `Round-trip latency: ${this.latency}ms`);
 
+            this.uiManager.updateNetworkStatus(NetworkState.CONNECTED, this.latency);
+
+            if (data.length > 1) {
+                for (let i = 0; i < playerCount + 1; i++) {
+                    // timestamp + pelaajakohtaisen datan pituus
+                    const baseIndex = 1 + (i * valuesPerPlayer);
+                    const player = {
+                        player_id: data[baseIndex],
+                        position: {
+                            x: data[baseIndex + 1],
+                            y: data[baseIndex + 2],
+                            z: data[baseIndex + 3],
+                        },
+                        rotation: {
+                            x: data[baseIndex + 4],
+                            y: data[baseIndex + 5],
+                            z: data[baseIndex + 6],
+                            w: data[baseIndex + 7],
+                        },
+                        velocity: {
+                            x: data[baseIndex + 8],
+                            y: data[baseIndex + 9],
+                            z: data[baseIndex + 10],
+                        },
+                        activity: data[baseIndex + 11],
+                    };
+                    players.push(player);
+                }
+            }
             this.updateOtherPlayers(players);
         });
 
         this.ws.addEventListener("open", () => {
-            this.addDebugLog("info", "Websocket connected");
-            this.setState(State.READY);
-            this.setNetworkState(NetworkState.CONNECTED);
+            this.uiManager.addDebugLog("info", "Websocket connected");
+            this.uiManager.setState(State.READY);
+            this.uiManager.updateNetworkStatus(NetworkState.CONNECTED, this.latency);
 
             if (this.sendInterval) {
                 clearInterval(this.sendInterval);
@@ -2412,6 +2084,7 @@ export default class Game {
                             this.playerVelocity.y,
                             this.playerVelocity.z,
                             this.playerActive ? 1.0 : 0.0,
+                            Date.now(),
                         ]);
 
                         const packetStr = JSON.stringify(packet, null, 2);
@@ -2419,7 +2092,7 @@ export default class Game {
                         try {
                             this.ws.send(data.buffer);
                         } catch (e) {
-                            this.addDebugLog(
+                            this.uiManager.addDebugLog(
                                 "error",
                                 `WebSocket send failed: ${e.message}`,
                             );
@@ -2436,8 +2109,8 @@ export default class Game {
         });
 
         this.ws.addEventListener("close", (event) => {
-            this.setNetworkState(NetworkState.DISCONNECTED);
-            this.addDebugLog(
+            this.uiManager.updateNetworkStatus(NetworkState.DISCONNECTED, this.latency);
+            this.uiManager.addDebugLog(
                 "info",
                 `websocket closed. ${event.code} ${event.reason}`,
             );
@@ -2446,8 +2119,12 @@ export default class Game {
     }
     async init() {
         try {
-            this.addDebugLog("info", "Debug log initialized");
-            this.addDebugLog("info", `Player id: ${this.playerId}`);
+            this.uiManager = new UIManager(this);
+            this.uiManager.init();
+
+            this.uiManager.addDebugLog("info", "Debug log initialized");
+            this.uiManager.addDebugLog("info", `Player id: ${this.playerId}`);
+
             try {
                 this.websocketConnect();
             } catch (e) {
@@ -2519,22 +2196,22 @@ export default class Game {
                 throw e;
             }
 
-            this.setState(State.READY);
+            this.uiManager.setState(State.READY);
             this.animate();
 
             setTimeout(() => {
                 if (!this.isMobile) {
-                    this.addToastMessage("Use WASD to drive.");
+                    this.uiManager.addToastMessage("Use WASD to drive.");
                 } else {
-                    this.addToastMessage("Use the Joystick to steer.")
+                    this.uiManager.addToastMessage("Use the Joystick to steer.")
                 }
             }, 2000);
 
             setTimeout(() => {
                 if (!this.isMobile) {
-                    this.addToastMessage("Use Spacebar for handbrake.");
+                    this.uiManager.addToastMessage("Use Spacebar for handbrake.");
                 } else {
-                    this.addToastMessage("Use a for acceleration, b for braking and h for handbrake.")
+                    this.uiManager.addToastMessage("Use a for acceleration, b for braking and h for handbrake.")
                 }
             }, 4000);
 
@@ -2549,8 +2226,7 @@ export default class Game {
             //    `
             //    , 15);
         } catch (error) {
-            console.error("Failed to initialize game:", error);
-            this.setState(State.ERROR, error.message);
+            this.uiManager.setState(State.ERROR, error.message);
         }
     }
 

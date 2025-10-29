@@ -1,4 +1,5 @@
 @import url('mobile-controls.css');
+
 :root {
     --network-status-color: #808080;
 }
@@ -253,14 +254,23 @@ footer {
 
 .network-status-icon {
     position: absolute;
-    top: 2%;
-    right: 2%;
+    right: 1%;
     width: 20px;
     height: 20px;
     border-radius: 50%;
     background-color: var(--network-status-color, #808080);
     border: 1px solid #001;
     transition: background-color 1s;
+}
+
+.latency-text {
+    position: absolute;
+    top: 5%;
+    right: 4%;
+    font-size: 18px;
+    font-weight: bold;
+    color: white;
+    -webkit-text-stroke: 1px black;
 }
 
 .game-pop {
@@ -384,5 +394,3 @@ footer {
 .debug-log-entry.debug-info .debug-text {
     color: #bfffbf;
 }
-
-
