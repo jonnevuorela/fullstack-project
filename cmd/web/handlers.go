@@ -139,6 +139,7 @@ func (app *application) websocket(w http.ResponseWriter, r *http.Request) {
 		// floats[4:8] rotation (x,y,z,w)
 		// floats[8:11] velocity (x,y,z)
 		// floats[11] activity bool
+		// floats[12] epoch time
 		//	app.infoLog.Printf("Received data from player %v:\npos(%.2f, %.2f, %.2f)\nrot(%.2f, %.2f, %2f, %2f)\nvel(%.2f, %.2f, %.2f)\n",
 		//		player.Id,
 		//		floats[1], floats[2], floats[3],
@@ -154,6 +155,10 @@ func (app *application) websocket(w http.ResponseWriter, r *http.Request) {
 		if floats[11] == 1.0 {
 			app.players.UpdateActivity(player.Id)
 		}
+		clientTime := int64(floats[12])
+		clientToServerTime := time.Now().UnixMilli() - int64(clientTime)
+
+		app.infoLog.Printf("client to server latency: %v ms", clientToServerTime)
 		err = app.locations.Save(player.Id, location)
 		if err != nil {
 			app.errorLog.Printf("Websocket write error: %v", err)
@@ -190,7 +195,9 @@ func (app *application) websocket(w http.ResponseWriter, r *http.Request) {
 
 		if len(validPlayers) > 0 {
 
-			responseData := make([]float64, len(validPlayers)*12)
+			// timestamp + pelaajakohtaisen datan pituus
+			responseData := make([]float64, 1+len(validPlayers)*12)
+			responseData[0] = float64(clientTime)
 			for i := 0; i < len(validPlayers); i++ {
 				var acitivity float64
 				if time.Since(validPlayers[i].LastActive) < time.Minute {
@@ -198,7 +205,7 @@ func (app *application) websocket(w http.ResponseWriter, r *http.Request) {
 				} else {
 					acitivity = 0.0
 				}
-				baseIndex := i * 12
+				baseIndex := 1 + i*12
 				responseData[baseIndex] = float64(validPlayers[i].Id)
 				responseData[baseIndex+1] = validPlayers[i].Location.PositionX
 				responseData[baseIndex+2] = validPlayers[i].Location.PositionY
@@ -221,26 +228,16 @@ func (app *application) websocket(w http.ResponseWriter, r *http.Request) {
 			err = conn.WriteMessage(websocket.BinaryMessage, buf)
 			if err != nil {
 				app.errorLog.Printf("Error sending player data to client: %v", err)
-			} else {
-				dataStr := "sent player data:\n"
-				for i := 0; i < len(validPlayers); i++ {
-					baseIndex := i * 12
-					dataStr += fmt.Sprintf("Player %d:\n"+
-						"  ID: %.0f\n"+
-						"  Position: (%.2f, %.2f, %.2f)\n"+
-						"  Rotation: (%.2f, %.2f, %.2f, %.2f)\n"+
-						"  Velocity: (%.2f, %.2f, %.2f)\n"+
-						"  Active: %.0f\n",
-						i,
-						responseData[baseIndex],
-						responseData[baseIndex+1], responseData[baseIndex+2], responseData[baseIndex+3],
-						responseData[baseIndex+4], responseData[baseIndex+5], responseData[baseIndex+6], responseData[baseIndex+7],
-						responseData[baseIndex+8], responseData[baseIndex+9], responseData[baseIndex+10],
-						responseData[baseIndex+11])
-				}
-				app.infoLog.Print(dataStr)
 			}
+		} else {
 
+			responseData := make([]float64, 1)
+			responseData[0] = float64(clientTime)
+
+			buf := make([]byte, len(responseData)*8)
+			for i := 0; i < len(responseData); i++ {
+				binary.LittleEndian.PutUint64(buf[i*8:], math.Float64bits(responseData[i]))
+			}
 		}
 
 	}
