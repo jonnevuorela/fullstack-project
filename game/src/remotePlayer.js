@@ -1,6 +1,7 @@
 import * as THREE from "three";
 // Lähtökohta AI generoitu, josta kehitystä jatkettu - Claude Sonnet 3.5
 // Now I require you to do something extra important. i want you to implement two features here and take your time implementing them as they are core features and can make or break this build. Now that we get other players over the websocket, we need to collect and manage them accordingly. we want to render a car for each other player like we do for the player, but the wheels should not be physics simulated. essentially i want lighter version of players car. collider ofcourse for collisions, rotating and steering adjusted wheels would be nice but we dont want to simulate them as it would be heavy. as the update intervall is 1000ms quite long by intention to reduce netork traffic, we need movement prediction for other players from the rotation position and velcity by calculation. this is the second huge feature so take your time on this also. the other players would have their name on top of them and colliders disabled and sleeping icon on top of them if they are inactive. again i cant stress enough this but do take your time and try to make it as robust as possible.
+
 export default class RemotePlayer {
     constructor(game, playerData, packetInterval, debug = false) {
         this.game = game;
@@ -110,7 +111,7 @@ export default class RemotePlayer {
 
             this.initialized = true;
         } catch (error) {
-            this.game.addDebugLog(
+            this.game.uiManager.addDebugLog(
                 "error",
                 `Failed to initialize RemotePlayer ${this.id}`,
             );
@@ -141,12 +142,19 @@ export default class RemotePlayer {
         this.vehicleMesh = this.models.body.clone();
         this.vehicleMesh.frustumCulled = false;
 
+        // mittojen asettelu noudattaa eri logiikkaa kuin pelaajan auto,
+        // mutta samasta kaavasta saadaan tehtyä myös remoteplayerille auto.
+        const tune = new Tune();
+        const wheelPosX = tune.halfVehicleWidth - tune.wheelWidth / 3;
+        const wheelPosY = tune.halfVehicleHeight + tune.wheelOffsetVertical;
+        const wheelPosZ = tune.wheelBase;
+
         this.wheels = [];
         const wheelPositions = [
-            { x: 1.695, y: this.GROUND_LEVEL * 2, z: 2.43, left: true, front: true },
-            { x: -1.695, y: this.GROUND_LEVEL * 2, z: 2.43, left: false, front: true },
-            { x: 1.695, y: this.GROUND_LEVEL * 2, z: -2.43, left: true, front: false },
-            { x: -1.695, y: this.GROUND_LEVEL * 2, z: -2.43, left: false, front: false },
+            { x: wheelPosX, y: wheelPosY, z: wheelPosZ + tune.wheelOffsetLongitudal, left: true, front: true },
+            { x: -wheelPosX, y: wheelPosY, z: wheelPosZ + tune.wheelOffsetLongitudal, left: false, front: true },
+            { x: wheelPosX, y: wheelPosY, z: -wheelPosZ + tune.wheelOffsetLongitudal / 2, left: true, front: false },
+            { x: -wheelPosX, y: wheelPosY, z: -wheelPosZ + tune.wheelOffsetLongitudal / 2, left: false, front: false },
         ];
 
         wheelPositions.forEach((pos) => {
@@ -498,7 +506,7 @@ export default class RemotePlayer {
     calculateAggressiveTarget() {
         // Predict where the vehicle WILL BE at next packet
         const predictionTime = this.PACKET_INTERVAL * this.EXTRAPOLATION_SCALE *
-            this.predictionConfidence;
+            Math.min(this.predictionConfidence, 1);
 
         // Position extrapolation with acceleration
         this.targetPosition.copy(this.position);
@@ -568,7 +576,7 @@ export default class RemotePlayer {
         }
     }
 
-    predict(currentTime, deltaTime) {
+    predict(currentTime, deltaTime, latency) {
         if (!this.initialized || !this.vehicleMesh) return;
         if (this.stateHistory.length < 1) return;
 
@@ -583,10 +591,13 @@ export default class RemotePlayer {
             return;
         }
 
+        const latencySeconds = latency / 1000;
+        const predictedTime = timeSinceUpdate + latencySeconds;
+
         // LINEAR INTERPOLATION: Calculate progress from 0 to 1
         // 0 = at start position (where we were visually when packet arrived)
         // 1 = at target position (predicted next packet position)
-        const alpha = Math.min(timeSinceUpdate / this.PACKET_INTERVAL, 1.0) *
+        const alpha = Math.min(predictedTime / this.PACKET_INTERVAL, 1.0) *
             1.1;
 
         // Linear interpolation from start to target
@@ -615,35 +626,43 @@ export default class RemotePlayer {
 
     updateWheels(deltaTime) {
         const speed = this.velocity.length();
-        const wheelRotationSpeed = speed * deltaTime * 0.5;
 
-        const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(
-            this.currentRotation,
-        );
+        const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(this.currentRotation);
+
+        const velocityDir = this.velocity.clone().normalize();
+        const forwardDot = forward.dot(velocityDir);
+        const isReverse = forwardDot < 0;
+
+        const wheelRotationSpeed = speed * deltaTime * (isReverse ? 1 : -1);
 
         let steerAngle = 0;
-        if (speed > 0.1 && this.velocity.length() > 0.1) {
-            const velocityDir = this.velocity.clone().normalize();
-            const cross = new THREE.Vector3().crossVectors(
-                forward,
-                velocityDir,
-            );
-            const dot = forward.dot(velocityDir);
-            steerAngle = Math.atan2(cross.x, dot);
-            steerAngle = Math.max(
-                Math.PI / 3,
-                Math.min(-Math.PI / 3, steerAngle),
-            );
+        if (speed > 0.1) {
+            const right = new THREE.Vector3(1, 0, 0).applyQuaternion(this.currentRotation);
+
+            const lateralComponent = velocityDir.dot(right);
+
+            steerAngle = -Math.atan2(lateralComponent, Math.abs(forwardDot));
+
+            const maxSteerAngle = Math.PI / 3;
+            steerAngle = Math.max(-maxSteerAngle, Math.min(maxSteerAngle, steerAngle));
         }
 
         this.wheels.forEach((wheel) => {
-            wheel.userData.rollAngle += wheelRotationSpeed;
-            wheel.rotation.y = wheel.userData.rollAngle;
+            wheel.userData.rollAngle = (wheel.userData.rollAngle || 0) + wheelRotationSpeed;
+
+            if (wheel.userData.isLeft) {
+                wheel.rotation.x = wheel.userData.rollAngle - Math.PI / 2;
+            } else {
+                wheel.rotation.x = -wheel.userData.rollAngle + Math.PI / 2;
+            }
 
             if (wheel.userData.front) {
                 wheel.userData.steerAngle = steerAngle;
-                wheel.rotation.z = wheel.userData.steerAngle;
+                wheel.rotation.z = steerAngle;
+            } else {
+                wheel.rotation.z = 0;
             }
+
         });
     }
 
@@ -662,5 +681,53 @@ export default class RemotePlayer {
         }
         console.log(`RemotePlayer ${this.id} removed`);
         game.addDebugLog("info", `RemotePlayer ${this.id} removed`);
+    }
+}
+
+export class Tune {
+    constructor() {
+        this.wheelRadius = 0.55;
+        this.wheelWidth = 0.6;
+
+        this.halfVehicleLength = 4.445;
+        this.halfVehicleWidth = 1.695;
+        this.halfVehicleHeight = 0.9;
+        this.wheelBase = this.halfVehicleLength / 1.83;
+
+        this.wheelOffset = -0.2;
+        this.wheelOffsetVertical = -0.64;
+        this.wheelOffsetLongitudal = 0.4;
+
+        this.maxSteerAngle = this.degreesToRadians(60);
+
+        this.suspensionMinLength = 0.4;
+        this.suspensionMaxLength = 1;
+        this.suspensionPreloadLenght = 1;
+        this.suspensionStiffness = 1;
+        this.suspensionDamping = 1;
+        this.suspensionFrequency = 1;
+        this.frontTyreLateralFriction = 15;
+        this.frontTyreLongitudalFriction = 1;
+        this.rearTyreLateralFriction = 2;
+        this.rearTyreLongitudalFriction = 15;
+
+        this.transmissionModeAuto = true;
+        this.fourWheelDrive = false;
+        this.torqueSplitRatio = 1.4;
+        this.differentialLimitedSlipRatio = 1.3;
+        this.antiRollbar = true;
+
+        this.maxEngineTorque = 2500.0;
+        this.clutchStrength = 1000.0;
+        this.minRPM = 400;
+        this.maxRPM = 8000;
+        this.damperMass = 1.0;
+        this.flywheelMass = 1.0;
+
+        this.vehicleMass = 1200.0;
+    }
+
+    degreesToRadians(degrees) {
+        return (degrees * Math.PI) / 180;
     }
 }

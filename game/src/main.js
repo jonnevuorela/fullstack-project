@@ -56,7 +56,7 @@ export default class Game {
         this.canvasContainer = document.getElementById("gameCanvas");
         this.isMobile = false;
         this.uiManager = null;
-        this.debugMode = true;
+        this.debugMode = false;
         this.currentRPM = 0;
 
         // audio
