@@ -5,7 +5,6 @@ game/node_modules
 deploy.log
 
 # binaries
-web
 ui/static/game/*
 
 # secrets
