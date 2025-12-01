@@ -20,8 +20,8 @@ npm run build
 
 cd $HOME/fullstack-project
 
-echo "[$(date)] Running go build..."
-go build ./cmd/web
+echo "[$(date)] Running tests and go build..."
+gotestsum --format testname --  ./... && go build ./cmd/web
 
 echo "[$(date)] Restarting systemd service..."
 sudo systemctl restart game-jonnevuorela-web.service
