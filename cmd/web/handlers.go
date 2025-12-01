@@ -264,7 +264,6 @@ func (app *application) userSignup(writer http.ResponseWriter, request *http.Req
 
 func (app *application) userSignupPost(writer http.ResponseWriter, request *http.Request) {
 	var form userSignupForm
-
 	err := app.decodePostForm(request, &form)
 	if err != nil {
 		app.clientError(writer, http.StatusBadRequest)
@@ -285,7 +284,7 @@ func (app *application) userSignupPost(writer http.ResponseWriter, request *http
 		return
 	}
 
-	err = app.users.Insert(form.Username, form.Email, form.Password)
+	_, err = app.users.Insert(form.Username, form.Email, form.Password)
 	if err != nil {
 		if errors.Is(err, models.ErrDuplicateUsername) {
 			form.AddFieldError("username", "Username is already in use")
