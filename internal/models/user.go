@@ -26,7 +26,7 @@ type UserModel struct {
 	DB *sql.DB
 }
 type UserModelInterface interface {
-	Insert(username string, email string, password string) error
+	Insert(username string, email string, password string) (int, error)
 	Authenticate(username string, password string) (int, error)
 	Exists(id int) (bool, error)
 	Get(id int) (*User, error)
@@ -59,7 +59,7 @@ func (m *UserModel) Authenticate(email string, password string) (int, error) {
 	return id, nil
 }
 
-func (m *UserModel) Insert(username string, email string, password string) error {
+func (m *UserModel) Insert(username string, email string, password string) (int, error) {
 	println("============ User model Insert ============")
 	println("username", username)
 	if email != "" {
@@ -67,18 +67,19 @@ func (m *UserModel) Insert(username string, email string, password string) error
 	}
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), 12)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	println("password hash", hashedPassword)
 
 	var result sql.Result
 	println(email)
+	var stmt string
 	if email != "" {
-		stmt := `INSERT INTO users (username, email, hashed_password, create_time)
+		stmt = `INSERT INTO users (username, email, hashed_password, create_time)
    VALUES(?, ?, ?, UTC_TIMESTAMP())`
 		result, err = m.DB.Exec(stmt, username, email, string(hashedPassword))
 	} else {
-		stmt := `INSERT INTO users (username, hashed_password, create_time)
+		stmt = `INSERT INTO users (username, hashed_password, create_time)
    VALUES(?, ?, UTC_TIMESTAMP())`
 		result, err = m.DB.Exec(stmt, username, string(hashedPassword))
 	}
@@ -86,16 +87,16 @@ func (m *UserModel) Insert(username string, email string, password string) error
 		log.Println("Exec error:", err)
 		var mySQLError *mysql.MySQLError
 		if errors.As(err, &mySQLError) {
-			if mySQLError.Number == 1062 && strings.Contains(mySQLError.Message, "users_uc_username") {
+			if mySQLError.Number == 1062 && strings.Contains(mySQLError.Message, "for key 'username_UNIQUE'") {
 				println(mySQLError)
-				return ErrDuplicateUsername
+				return 0, ErrDuplicateUsername
 			}
-		} else {
-			println(err)
-			return err
 		}
-
-		return err
+		return 0, err
+	}
+	id, err := result.LastInsertId()
+	if err != nil {
+		return 0, err
 	}
 	rows, err := result.RowsAffected()
 	if err != nil {
@@ -104,7 +105,7 @@ func (m *UserModel) Insert(username string, email string, password string) error
 	log.Println("Rows affected:", rows)
 
 	println("================== ok ======================")
-	return nil
+	return int(id), nil
 }
 
 func (m *UserModel) Exists(id int) (bool, error) {
