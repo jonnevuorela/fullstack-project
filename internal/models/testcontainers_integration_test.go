@@ -171,6 +171,9 @@ func getTestDB(t *testing.T) *sql.DB {
 	return testDB
 }
 
+// AI:n tarjoama ratkaisu testcontainers kirjaston ongelmaan
+// käsitellä MySQL Workbenchillä luotua sql scriptiä
+// ChatGPT-5 mini
 func splitSQLStatements(src string) []string {
 	var stmts []string
 	delimiter := ";"
