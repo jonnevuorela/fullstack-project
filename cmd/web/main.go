@@ -27,6 +27,7 @@ type application struct {
 	users          models.UserModelInterface
 	players        models.PlayerModelIntarface
 	locations      models.LocationModelIntarface
+	tunes          models.TuneModelIntarface
 	templateCache  map[string]*template.Template
 	sessionManager *scs.SessionManager
 	upgrader       websocket.Upgrader
@@ -109,6 +110,7 @@ func main() {
 		users:     &models.UserModel{DB: db},
 		players:   &models.PlayerModel{DB: db},
 		locations: &models.LocationModel{DB: db},
+		tunes:     &models.TuneModel{DB: db},
 	}
 
 	srv := &http.Server{

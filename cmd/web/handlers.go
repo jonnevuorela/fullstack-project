@@ -284,7 +284,7 @@ func (app *application) userSignupPost(writer http.ResponseWriter, request *http
 		return
 	}
 
-	_, err = app.users.Insert(form.Username, form.Email, form.Password)
+	userId, err := app.users.Insert(form.Username, form.Email, form.Password)
 	if err != nil {
 		if errors.Is(err, models.ErrDuplicateUsername) {
 			form.AddFieldError("username", "Username is already in use")
@@ -298,6 +298,15 @@ func (app *application) userSignupPost(writer http.ResponseWriter, request *http
 		return
 	}
 
+	defaultTune := models.NewTune()
+	tuneID, err := app.tunes.Insert(defaultTune)
+	if err != nil {
+		app.serverError(writer, err)
+	} else if tuneID != nil {
+		if err := app.users.UpdateSavedTune(userId, *tuneID); err != nil {
+			app.serverError(writer, err)
+		}
+	}
 	app.sessionManager.Put(request.Context(), "flash", "Your signup was successful. Plese log in.")
 
 	http.Redirect(writer, request, "/user/login", http.StatusSeeOther)
