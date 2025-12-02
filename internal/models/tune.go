@@ -40,43 +40,68 @@ type TuneModel struct {
 }
 
 type TuneModelIntarface interface {
-	Insert(tune Tune) error
+	Insert(tune Tune) (*int, error)
 	Get(id int) (*Tune, error)
 	UpdateDBWithTune(int, Tune) error
 }
 
 func (t *TuneModel) UpdateDBWithTune(id int, tune Tune) error {
-	stmt := `UPDATE tunes 
-				SET 				
-					wheel_radius = ?,
-					wheel_width = ?,
-					wheel_offset = ? ,
-					wheel_vertical_offset = ? ,
-					wheel_longitudal_offset = ?,
-					max_steering_angle = ?,
-					suspension_lenght_min = ?,
-					suspension_lenght_max = ?,
-					suspension_preload = ?,
-					suspension_damping = ?,
-					suspension_stiffness = ?,
-					front_tyre_lateral_friction = ?,
-					front_tyre_longitudal_friction = ?,
-					rear_tyre_lateral_friction = ?,
-					rear_tyre_longitudal_friction = ?,
-					four_wheel_drive = ?,
-					antirollbar = ?,
-					torque_split_ratio = ?,
-					differential_limited_slip_ratio = ?,
-					max_engine_torque = ?,
-					clutch_strenght,
-					min_rpm,
-					max_rpm,
-					damper_mass,
-					flywheel_mass,
-					vehicle_mass
-				WHERE id = ?`
+	stmt := `UPDATE tunes SET 
+		wheel_radius = ?,
+		wheel_width = ?,
+		wheel_offset = ?,
+		wheel_vertical_offset = ?,
+		wheel_longitudal_offset = ?,
+		max_steering_angle = ?,
+		suspension_lenght_min = ?,
+		suspension_lenght_max = ?,
+		suspension_preload = ?,
+		suspension_damping = ?,
+		suspension_stiffness = ?,
+		front_tyre_lateral_friction = ?,
+		front_tyre_longitudal_friction = ?,
+		rear_tyre_lateral_friction = ?,
+		rear_tyre_longitudal_friction = ?,
+		four_wheel_drive = ?,
+		antirollbar = ?,
+		torque_split_ratio = ?,
+		differential_limited_slip_ratio = ?,
+		max_engine_torque = ?,
+		clutch_strenght = ?,
+		min_rpm = ?,
+		max_rpm = ?,
+		damper_mass = ?,
+		flywheel_mass = ?,
+		vehicle_mass = ?
+		WHERE id = ?`
 
 	_, err := t.DB.Exec(stmt,
+		tune.WheelRadius,
+		tune.WheelWidth,
+		tune.WheelOffset,
+		tune.WheelVerticalOffset,
+		tune.WheelLongitudalOffset,
+		tune.MaxSteeringAngle,
+		tune.SuspensionLenghtMin,
+		tune.SuspensionLenghtMax,
+		tune.SuspensionPreload,
+		tune.SuspensionDamping,
+		tune.SuspensionStiffeness,
+		tune.FrontTyreLateralFriction,
+		tune.FrontTyreLongitudalFriction,
+		tune.RearTyreLateralFriction,
+		tune.RearTyreLongitudalFriction,
+		tune.FourWheelDrive,
+		tune.Antirollbar,
+		tune.TorqueSplitRatio,
+		tune.DifferentialLimitedSlipRatio,
+		tune.MaxEngineTorque,
+		tune.ClutchStrenght,
+		tune.MinRpm,
+		tune.MaxRpm,
+		tune.DamperMass,
+		tune.FlywheelMass,
+		tune.VehicleMass,
 		id,
 	)
 	if err != nil {
@@ -91,8 +116,40 @@ func (t *TuneModel) UpdateDBWithTune(id int, tune Tune) error {
 }
 func (t *TuneModel) Get(id int) (*Tune, error) {
 	tune := NewTune()
-	stmt := "SELECT * FROM tunes WHERE id = ?"
+
+	stmt := `SELECT
+        id,
+        wheel_radius,
+        wheel_width,
+        wheel_offset,
+        wheel_vertical_offset,
+        wheel_longitudal_offset,
+        max_steering_angle,
+        suspension_lenght_min,
+        suspension_lenght_max,
+        suspension_preload,
+        suspension_damping,
+        suspension_stiffness,
+        front_tyre_lateral_friction,
+        front_tyre_longitudal_friction,
+        rear_tyre_lateral_friction,
+        rear_tyre_longitudal_friction,
+        four_wheel_drive,
+        antirollbar,
+        torque_split_ratio,
+        differential_limited_slip_ratio,
+        max_engine_torque,
+        clutch_strenght,
+        min_rpm,
+        max_rpm,
+        damper_mass,
+        flywheel_mass,
+        vehicle_mass
+    FROM tunes WHERE id = ?`
+
+	var tuneID int
 	err := t.DB.QueryRow(stmt, id).Scan(
+		&tuneID,
 		&tune.WheelRadius,
 		&tune.WheelWidth,
 		&tune.WheelOffset,
@@ -118,14 +175,14 @@ func (t *TuneModel) Get(id int) (*Tune, error) {
 		&tune.MaxRpm,
 		&tune.DamperMass,
 		&tune.FlywheelMass,
-		&tune.VehicleMass)
+		&tune.VehicleMass,
+	)
 	if err != nil {
 		var mySQLError *mysql.MySQLError
 		if errors.As(err, &mySQLError) {
 			return nil, mySQLError
-		} else {
-			return nil, err
 		}
+		return nil, err
 	}
 	return &tune, nil
 }

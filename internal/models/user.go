@@ -30,6 +30,8 @@ type UserModelInterface interface {
 	Authenticate(username string, password string) (int, error)
 	Exists(id int) (bool, error)
 	Get(id int) (*User, error)
+	Update(id int, username, email, password string) error
+	UpdateSavedTune(userID int, tuneID int) error
 }
 
 func (m *UserModel) Authenticate(email string, password string) (int, error) {
@@ -141,4 +143,35 @@ func (m *UserModel) Get(id int) (*User, error) {
 	}
 
 	return &user, err
+}
+
+func (m *UserModel) Update(id int, username, email, password string) error {
+	if password != "" {
+		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), 12)
+		if err != nil {
+			return err
+		}
+		stmt := `UPDATE users SET username = ?, email = ?, hashed_password = ? WHERE id = ?`
+		_, err = m.DB.Exec(stmt, username, email, string(hashedPassword), id)
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+
+	stmt := `UPDATE users SET username = ?, email = ? WHERE id = ?`
+	_, err := m.DB.Exec(stmt, username, email, id)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (m *UserModel) UpdateSavedTune(userID int, tuneID int) error {
+	stmt := `UPDATE users SET saved_tune_id = ? WHERE id = ?`
+	_, err := m.DB.Exec(stmt, tuneID, userID)
+	if err != nil {
+		return err
+	}
+	return nil
 }
