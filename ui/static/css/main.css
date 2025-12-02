@@ -15,30 +15,43 @@
 html,
 body {
     height: 100%;
+    background-color: #000;
 }
 
 body {
     line-height: 1.5;
-    background-color: #F1F3F6;
-    color: #34495E;
+    color: #D3D3D3;
+    background-size:     contain;
+    background-repeat:   no-repeat;
+    background-position: center center;    
+    background-image:
+
+      radial-gradient( transparent 30%, black 60%),
+      url("/static/car_mmo.png");
+
 }
 
 header,
 nav,
-main,
-footer {
+main{
     padding: 2px calc((100% - 800px) / 2) 0;
 }
 
-main {
+main, .form, .text-container {
     margin-top: 54px;
     margin-bottom: 54px;
     min-height: calc(100vh - 345px);
     padding: 2px calc((100% - 800px) / 2) 0;
 }
 
+footer {
+    margin-top: 20vh;
+    padding-top: 20px;
+    bottom: 0;
+}
+
 a {
-    color: #003049;
+    color: #4169E1;
     text-decoration: none;
 }
 
@@ -47,11 +60,21 @@ a:hover {
     text-decoration: underline;
 }
 
+.form, .text-container{
+ background-color: rgba(0, 0,0, 0.4);
+ -webkit-backdrop-filter: blur(50px);
+ backdrop-filter: blur(50px);
+ padding: 20px;
+}
+
+header,nav, footer {
+    background-color: #111111;
+}
+
 nav {
-    border-bottom: 1px solid #E4E5E7;
+    border-bottom: 1px solid #1B1B1B;
     padding-top: 17px;
     padding-bottom: 15px;
-    background: #F7F9FA;
     height: 60px;
     color: #6A6C6F;
 }
@@ -81,7 +104,7 @@ nav div:last-child a {
 }
 
 nav a.live {
-    color: #00222c;
+    color: #4169A0;
     cursor: default;
 }
 
@@ -97,9 +120,9 @@ nav a.live:after {
     top: 9px;
     width: 14px;
     height: 14px;
-    background: #F7F9FA;
-    border-left: 1px solid #E4E5E7;
-    border-bottom: 1px solid #E4E5E7;
+    background: #4169E1;
+    border-left: 1px solid #1B1B1B;
+    border-bottom: 1px solid #1B1B1B;
     -moz-transform: rotate(45deg);
     -webkit-transform: rotate(-45deg);
 }
@@ -129,7 +152,7 @@ form div {
 }
 
 form div:last-child {
-    border-top: 1px dashed #E4E5E7;
+    border-top: 1px dashed #1B1B1B;
 }
 
 form input[type="radio"] {
@@ -138,7 +161,9 @@ form input[type="radio"] {
 
 form input[type="username"],
 form input[type="password"],
-form input[type="email"] {
+form input[type="email"],
+form input[type="text"] {
+
     padding: 0.75em 18px;
     width: 100%;
 }
@@ -146,10 +171,11 @@ form input[type="email"] {
 form input[type="username"],
 form input[type="password"],
 form input[type="email"],
+form input[type="text"],
 textarea {
-    color: #003049;
-    background: #FFFFFF;
-    border: 1px solid #E4E5E7;
+    color: #FFFFFF;
+    background: #000;
+    border: 1px solid #1B1B1B;
     border-radius: 3px;
 }
 
@@ -180,7 +206,7 @@ button {
     background: none;
     padding: 0;
     border: none;
-    color: #62CB31;
+    color: #4169E1;
     text-decoration: none;
 }
 
@@ -215,12 +241,8 @@ div.error {
 }
 
 footer {
-    border-top: 1px solid #E4E5E7;
-    padding-top: 17px;
-    padding-bottom: 15px;
-    background: #F7F9FA;
+    border-top: 1px solid #1B1B1B;
     height: 60px;
-    color: #6A6C6F;
     text-align: center;
 }
 
@@ -319,7 +341,7 @@ footer {
     width: 60px;
     height: 60px;
     border: 7px solid #eee;
-    border-top: 7px solid #3498db;
+    border-top: 7px solid #1B1B1B; 
     border-radius: 50%;
     animation: spin 1.1s linear infinite;
 }
