@@ -1,0 +1,159 @@
+{{define "title"}}Edit profile{{end}}
+
+{{define "main"}}
+<h1>Edit profile</h1>
+
+<form action="/user/profile/edit" class="form" method="POST" novalidate>
+  <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+
+  {{with .Form}}
+    {{range .NonFieldErrors}}
+      <div class="error">{{.}}</div>
+    {{end}}
+  {{end}}
+
+  <fieldset>
+    <legend>Account</legend>
+
+    <div>
+      <label for="username">Username:</label>
+      {{with .Form.FieldErrors.username}}<label class="error">{{.}}</label>{{end}}
+      <input id="username" type="text" name="username" value="{{.Form.Username}}">
+    </div>
+
+    <div>
+      <label for="email">Email (optional):</label>
+      {{with .Form.FieldErrors.email}}<label class="error">{{.}}</label>{{end}}
+      <input id="email" type="email" name="email" value="{{.Form.Email}}">
+    </div>
+
+    <div>
+      <label for="password">New password (leave blank to keep current):</label>
+      {{with .Form.FieldErrors.password}}<label class="error">{{.}}</label>{{end}}
+      <input id="password" type="password" name="password" value="">
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Tune (leave blank to keep current values)</legend>
+
+    <!-- Use the same list of fields as before, but binding to string fields -->
+    <div><label for="wheel_radius">Wheel radius:</label>
+      {{with .Form.FieldErrors.wheel_radius}}<label class="error">{{.}}</label>{{end}}
+      <input id="wheel_radius" name="wheel_radius" type="text" value="{{.Form.WheelRadius}}">
+    </div>
+
+    <div><label for="wheel_width">Wheel width:</label>
+      {{with .Form.FieldErrors.wheel_width}}<label class="error">{{.}}</label>{{end}}
+      <input id="wheel_width" name="wheel_width" type="text" value="{{.Form.WheelWidth}}">
+    </div>
+
+    <div><label for="wheel_offset">Wheel offset:</label>
+      {{with .Form.FieldErrors.wheel_offset}}<label class="error">{{.}}</label>{{end}}
+      <input id="wheel_offset" name="wheel_offset" type="text" value="{{.Form.WheelOffset}}">
+    </div>
+
+    <div><label for="wheel_vertical_offset">Wheel vertical offset:</label>
+      <input id="wheel_vertical_offset" name="wheel_vertical_offset" type="text" value="{{.Form.WheelVerticalOffset}}">
+    </div>
+
+    <div><label for="wheel_longitudal_offset">Wheel longitudal offset:</label>
+      <input id="wheel_longitudal_offset" name="wheel_longitudal_offset" type="text" value="{{.Form.WheelLongitudalOffset}}">
+    </div>
+
+    <div><label for="max_steering_angle">Max steering angle:</label>
+      <input id="max_steering_angle" name="max_steering_angle" type="text" value="{{.Form.MaxSteeringAngle}}">
+    </div>
+
+    <div><label for="suspension_lenght_min">Suspension length min:</label>
+      <input id="suspension_lenght_min" name="suspension_lenght_min" type="text" value="{{.Form.SuspensionLenghtMin}}">
+    </div>
+
+    <div><label for="suspension_lenght_max">Suspension length max:</label>
+      <input id="suspension_lenght_max" name="suspension_lenght_max" type="text" value="{{.Form.SuspensionLenghtMax}}">
+    </div>
+
+    <div><label for="suspension_preload">Suspension preload:</label>
+      <input id="suspension_preload" name="suspension_preload" type="text" value="{{.Form.SuspensionPreload}}">
+    </div>
+
+    <div><label for="suspension_damping">Suspension damping:</label>
+      <input id="suspension_damping" name="suspension_damping" type="text" value="{{.Form.SuspensionDamping}}">
+    </div>
+
+    <div><label for="suspension_stiffness">Suspension stiffness:</label>
+      <input id="suspension_stiffness" name="suspension_stiffness" type="text" value="{{.Form.SuspensionStiffeness}}">
+    </div>
+
+    <div><label for="front_tyre_lateral_friction">Front tyre lateral friction:</label>
+      <input id="front_tyre_lateral_friction" name="front_tyre_lateral_friction" type="text" value="{{.Form.FrontTyreLateralFriction}}">
+    </div>
+
+    <div><label for="front_tyre_longitudal_friction">Front tyre longitudal friction:</label>
+      <input id="front_tyre_longitudal_friction" name="front_tyre_longitudal_friction" type="text" value="{{.Form.FrontTyreLongitudalFriction}}">
+    </div>
+
+    <div><label for="rear_tyre_lateral_friction">Rear tyre lateral friction:</label>
+      <input id="rear_tyre_lateral_friction" name="rear_tyre_lateral_friction" type="text" value="{{.Form.RearTyreLateralFriction}}">
+    </div>
+
+    <div><label for="rear_tyre_longitudal_friction">Rear tyre longitudal friction:</label>
+      <input id="rear_tyre_longitudal_friction" name="rear_tyre_longitudal_friction" type="text" value="{{.Form.RearTyreLongitudalFriction}}">
+    </div>
+
+    <div>
+      <label for="four_wheel_drive">Four wheel drive:</label>
+      <input id="four_wheel_drive" name="four_wheel_drive" type="checkbox" value="on" {{if eq .Form.FourWheelDrive "on"}}checked{{end}}>
+    </div>
+
+    <div>
+      <label for="antirollbar">Antirollbar:</label>
+      <input id="antirollbar" name="antirollbar" type="checkbox" value="on" {{if eq .Form.Antirollbar "on"}}checked{{end}}>
+    </div>
+
+    <div><label for="torque_split_ratio">Torque split ratio:</label>
+      <input id="torque_split_ratio" name="torque_split_ratio" type="text" value="{{.Form.TorqueSplitRatio}}">
+    </div>
+
+    <div><label for="differential_limited_slip_ratio">Differential limited slip ratio:</label>
+      <input id="differential_limited_slip_ratio" name="differential_limited_slip_ratio" type="text" value="{{.Form.DifferentialLimitedSlip}}">
+    </div>
+
+    <div><label for="max_engine_torque">Max engine torque:</label>
+      {{with .Form.FieldErrors.max_engine_torque}}<label class="error">{{.}}</label>{{end}}
+      <input id="max_engine_torque" name="max_engine_torque" type="text" value="{{.Form.MaxEngineTorque}}">
+    </div>
+
+    <div><label for="clutch_strenght">Clutch strenght:</label>
+      <input id="clutch_strenght" name="clutch_strenght" type="text" value="{{.Form.ClutchStrenght}}">
+    </div>
+
+    <div><label for="min_rpm">Min RPM:</label>
+      <input id="min_rpm" name="min_rpm" type="text" value="{{.Form.MinRpm}}">
+    </div>
+
+    <div><label for="max_rpm">Max RPM:</label>
+      <input id="max_rpm" name="max_rpm" type="text" value="{{.Form.MaxRpm}}">
+    </div>
+
+    <div><label for="damper_mass">Damper mass:</label>
+      <input id="damper_mass" name="damper_mass" type="text" value="{{.Form.DamperMass}}">
+    </div>
+
+    <div><label for="flywheel_mass">Flywheel mass:</label>
+      <input id="flywheel_mass" name="flywheel_mass" type="text" value="{{.Form.FlywheelMass}}">
+    </div>
+
+    <div><label for="vehicle_mass">Vehicle mass:</label>
+      {{with .Form.FieldErrors.vehicle_mass}}<label class="error">{{.}}</label>{{end}}
+      <input id="vehicle_mass" name="vehicle_mass" type="text" value="{{.Form.VehicleMass}}">
+    </div>
+
+  </fieldset>
+
+  <div>
+    <input type="submit" value="Save">
+    <a href="/user/profile">Cancel</a>
+  </div>
+</form>
+{{end}}

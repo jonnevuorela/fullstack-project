@@ -1,0 +1,64 @@
+{{define "title"}}Profile{{end}}
+{{define "main"}}
+<div class="text-container">
+<h1>Profile</h1>
+
+{{with .Form}}
+  {{$view := .}}
+
+  <section >
+    <h2>Account</h2>
+    <p><strong>Username:</strong> {{$view.User.Username}}</p>
+    {{if $view.User.Email}}
+      <p><strong>Email:</strong> {{$view.User.Email}}</p>
+    {{end}}
+    <p><strong>Member for:</strong> {{$view.AccountAge}}</p>
+    <p><strong>Joined:</strong> {{humanDate $view.User.CreateTime}}</p>
+  </section>
+
+  <section class="text-container">
+    <h2>Tune</h2>
+    {{if $view.HasTune}}
+      <table>
+        <tbody>
+          <tr><th>Wheel radius</th><td>{{$view.Tune.WheelRadius}}</td></tr>
+          <tr><th>Wheel width</th><td>{{$view.Tune.WheelWidth}}</td></tr>
+          <tr><th>Wheel offset</th><td>{{$view.Tune.WheelOffset}}</td></tr>
+          <tr><th>Wheel vertical offset</th><td>{{$view.Tune.WheelVerticalOffset}}</td></tr>
+          <tr><th>Wheel longitudal offset</th><td>{{$view.Tune.WheelLongitudalOffset}}</td></tr>
+          <tr><th>Max steering angle</th><td>{{$view.Tune.MaxSteeringAngle}}</td></tr>
+          <tr><th>Suspension length min</th><td>{{$view.Tune.SuspensionLenghtMin}}</td></tr>
+          <tr><th>Suspension length max</th><td>{{$view.Tune.SuspensionLenghtMax}}</td></tr>
+          <tr><th>Suspension preload</th><td>{{$view.Tune.SuspensionPreload}}</td></tr>
+          <tr><th>Suspension damping</th><td>{{$view.Tune.SuspensionDamping}}</td></tr>
+          <tr><th>Suspension stiffness</th><td>{{$view.Tune.SuspensionStiffeness}}</td></tr>
+          <tr><th>Front tyre lateral friction</th><td>{{$view.Tune.FrontTyreLateralFriction}}</td></tr>
+          <tr><th>Front tyre longitudal friction</th><td>{{$view.Tune.FrontTyreLongitudalFriction}}</td></tr>
+          <tr><th>Rear tyre lateral friction</th><td>{{$view.Tune.RearTyreLateralFriction}}</td></tr>
+          <tr><th>Rear tyre longitudal friction</th><td>{{$view.Tune.RearTyreLongitudalFriction}}</td></tr>
+          <tr><th>Four wheel drive</th><td>{{if $view.Tune.FourWheelDrive}}Yes{{else}}No{{end}}</td></tr>
+          <tr><th>Antirollbar</th><td>{{if $view.Tune.Antirollbar}}Yes{{else}}No{{end}}</td></tr>
+          <tr><th>Torque split ratio</th><td>{{$view.Tune.TorqueSplitRatio}}</td></tr>
+          <tr><th>Differential limited slip ratio</th><td>{{$view.Tune.DifferentialLimitedSlipRatio}}</td></tr>
+          <tr><th>Max engine torque</th><td>{{$view.Tune.MaxEngineTorque}}</td></tr>
+          <tr><th>Clutch strenght</th><td>{{$view.Tune.ClutchStrenght}}</td></tr>
+          <tr><th>Min RPM</th><td>{{$view.Tune.MinRpm}}</td></tr>
+          <tr><th>Max RPM</th><td>{{$view.Tune.MaxRpm}}</td></tr>
+          <tr><th>Damper mass</th><td>{{$view.Tune.DamperMass}}</td></tr>
+          <tr><th>Flywheel mass</th><td>{{$view.Tune.FlywheelMass}}</td></tr>
+          <tr><th>Vehicle mass</th><td>{{$view.Tune.VehicleMass}}</td></tr>
+        </tbody>
+      </table>
+    {{else}}
+      <p>No tune saved yet.</p>
+    {{end}}
+  </section>
+
+  <p>
+    <a href="/user/profile/edit">Edit profile</a>
+  </p>
+{{end}}
+
+{{end}}
+
+</div>
