@@ -344,6 +344,8 @@ func (app *application) profileEditPost(w http.ResponseWriter, r *http.Request) 
 		}
 	}
 
+	app.broadcastTunesUpdate()
+
 	app.sessionManager.Put(r.Context(), "flash", "Profile updated successfully.")
 	http.Redirect(w, r, "/user/profile", http.StatusSeeOther)
 }
