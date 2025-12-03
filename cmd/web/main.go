@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"sync"
 	"time"
 
 	"fullstack-project.jonnevuorela.com/internal/models"
@@ -32,6 +33,8 @@ type application struct {
 	sessionManager *scs.SessionManager
 	upgrader       websocket.Upgrader
 	formDecoder    *form.Decoder
+	wsConnsMu      sync.Mutex
+	wsConns        map[*websocket.Conn]struct{}
 }
 
 func main() {
@@ -106,6 +109,7 @@ func main() {
 		sessionManager: sessionManager,
 		formDecoder:    formDecoder,
 		upgrader:       upgrader,
+		wsConns:        make(map[*websocket.Conn]struct{}),
 
 		users:     &models.UserModel{DB: db},
 		players:   &models.PlayerModel{DB: db},
