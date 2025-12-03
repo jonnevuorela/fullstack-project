@@ -7,7 +7,6 @@
   {{$view := .}}
 
   <section >
-    <h2>Account</h2>
     <p><strong>Username:</strong> {{$view.User.Username}}</p>
     {{if $view.User.Email}}
       <p><strong>Email:</strong> {{$view.User.Email}}</p>
@@ -17,7 +16,7 @@
   </section>
 
   <section class="text-container">
-    <h2>Tune</h2>
+    <h2>Tune Sheet</h2>
     {{if $view.HasTune}}
       <table>
         <tbody>
