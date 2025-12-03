@@ -1,22 +1,21 @@
 {{define "title"}}Login{{end}}
 
 {{define "main"}}
-
-<form class=".form" action='/user/login' method='POST' novalidate>
+<form action='/user/login' method='POST' novalidate>
    <input type='hidden' name='csrf_token' value='{{.CSRFToken}}'>
-   {{range .Form.NonFieldErrors}}
-      <div class='error'>{{.}}</div>
+   {{with .Form.Validator.NonFieldErrors}}
+      <div class='error'>{{index . 0}}</div>
    {{end}}
    <div>
       <label>Username:</label>
-      {{with .Form.FieldErrors.username}}
+      {{with .Form.Validator.FieldErrors.username}}
          <label class='error'>{{.}}</label>
       {{end}}
       <input type='username' name='username' value='{{.Form.Username}}'>
    </div>
    <div>
       <label>Password:</label>
-      {{with .Form.FieldErrors.password}}
+      {{with .Form.Validator.FieldErrors.password}}
          <label class='error'>{{.}}</label>
       {{end}}
       <input type='password' name='password'>

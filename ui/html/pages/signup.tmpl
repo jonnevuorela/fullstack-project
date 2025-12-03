@@ -1,25 +1,25 @@
 {{define "title"}}Signup{{end}}
 
 {{define "main"}}
-<form action='/user/signup'  class=".form"method='POST' novalidate>
+<form action='/user/signup' method='POST' novalidate>
    <input type='hidden' name='csrf_token' value='{{.CSRFToken}}'>
    <div>
       <label>Username</label> *
-      {{with .Form.FieldErrors.username}}
+      {{with .Form.Validator.FieldErrors.username}}
          <label class='error'>{{.}}</label>
       {{end}}
       <input type='username' name='username' value='{{.Form.Username}}'>
    </div>
    <div>
       <label>Email</label>
-      {{with .Form.FieldErrors.email}}
+      {{with .Form.Validator.FieldErrors.email}}
          <label class='error'>{{.}}</label>
       {{end}}
       <input type='email' name='email' value='{{.Form.Email}}'>
    </div>
    <div>
       <label>Password</label> *
-      {{with .Form.FieldErrors.password}}
+      {{with .Form.Validator.FieldErrors.password}}
          <label class='error'>{{.}}</label>
       {{end}}
       <input type='password' name='password'>
