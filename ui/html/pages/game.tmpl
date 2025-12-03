@@ -5,7 +5,60 @@
     </div>
     <script nonce="{{.Nonce}}">
     playerId = {{.PlayerID}};
-    console.log("Template PlayerID:", playerId, typeof playerId);
+    window.isAuthenticated = {{if .IsAuthenticated}}true{{else}}false{{end}};
+
+    {{if .PlayerUsername}}
+      window.playerUsername = {{printf "%q" .PlayerUsername}};
+    {{else}}
+      window.playerUsername = null;
+    {{end}}
+
+    {{if .PlayerTune}}
+      window.playerTune =       {
+        "wheel_radius": {{.PlayerTune.WheelRadius}},
+        "wheel_width": {{.PlayerTune.WheelWidth}},
+        "wheel_offset": {{.PlayerTune.WheelOffset}},
+        "wheel_vertical_offset": {{.PlayerTune.WheelVerticalOffset}},
+        "wheel_longitudal_offset": {{.PlayerTune.WheelLongitudalOffset}},
+        "max_steering_angle": {{.PlayerTune.MaxSteeringAngle}},
+        "suspension_lenght_min": {{.PlayerTune.SuspensionLenghtMin}},
+        "suspension_lenght_max": {{.PlayerTune.SuspensionLenghtMax}},
+        "suspension_preload": {{.PlayerTune.SuspensionPreload}},
+        "suspension_damping": {{.PlayerTune.SuspensionDamping}},
+        "suspension_stiffness": {{.PlayerTune.SuspensionStiffeness}},
+        "front_tyre_lateral_friction": {{.PlayerTune.FrontTyreLateralFriction}},
+        "front_tyre_longitudal_friction": {{.PlayerTune.FrontTyreLongitudalFriction}},
+        "rear_tyre_lateral_friction": {{.PlayerTune.RearTyreLateralFriction}},
+        "rear_tyre_longitudal_friction": {{.PlayerTune.RearTyreLongitudalFriction}},
+        "four_wheel_drive": {{if .PlayerTune.FourWheelDrive}}true{{else}}false{{end}},
+        "antirollbar": {{if .PlayerTune.Antirollbar}}true{{else}}false{{end}},
+        "torque_split_ratio": {{.PlayerTune.TorqueSplitRatio}},
+        "differential_limited_slip_ratio": {{.PlayerTune.DifferentialLimitedSlipRatio}},
+        "max_engine_torque": {{.PlayerTune.MaxEngineTorque}},
+        "clutch_strenght": {{.PlayerTune.ClutchStrenght}},
+        "min_rpm": {{.PlayerTune.MinRpm}},
+        "max_rpm": {{.PlayerTune.MaxRpm}},
+        "damper_mass": {{.PlayerTune.DamperMass}},
+        "flywheel_mass": {{.PlayerTune.FlywheelMass}},
+        "vehicle_mass": {{.PlayerTune.VehicleMass}}
+      };
+    {{else}}
+      window.playerTune = null;
+    {{end}}
+
+    {{if .PlayerLocation}}
+      window.playerLocation = {
+        "position_x": {{.PlayerLocation.PositionX}},
+        "position_y": {{.PlayerLocation.PositionY}},
+        "position_z": {{.PlayerLocation.PositionZ}},
+        "rotation_x": {{.PlayerLocation.RotationX}},
+        "rotation_y": {{.PlayerLocation.RotationY}},
+        "rotation_z": {{.PlayerLocation.RotationZ}},
+        "rotation_w": {{.PlayerLocation.RotationW}}
+      };
+    {{else}}
+      window.playerLocation = null;
+    {{end}}
     </script>
     <script type="module" nonce="{{.Nonce}}" src="/static/game/game.bundle.js"></script>
 {{end}}
