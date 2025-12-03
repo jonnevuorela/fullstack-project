@@ -274,10 +274,10 @@ func NewTune() Tune {
 		SuspensionPreload:            1,
 		SuspensionDamping:            1,
 		SuspensionStiffeness:         1,
-		FrontTyreLateralFriction:     1,
+		FrontTyreLateralFriction:     15,
 		FrontTyreLongitudalFriction:  1,
-		RearTyreLateralFriction:      1,
-		RearTyreLongitudalFriction:   1,
+		RearTyreLateralFriction:      2,
+		RearTyreLongitudalFriction:   15,
 		FourWheelDrive:               false,
 		Antirollbar:                  true,
 		TorqueSplitRatio:             1.4,
@@ -290,5 +290,4 @@ func NewTune() Tune {
 		FlywheelMass:                 1,
 		VehicleMass:                  1200,
 	}
-
 }
