@@ -40,6 +40,10 @@ export default class Game {
         this.gltfLoader = null;
         this.clock = null;
 
+        this.isWindowFocused = true;
+        this.maxDeltaTime = 1 / 30;
+        this.maxAccumulatedTime = 0.25;
+
         // physics
         this.Jolt = null;
         this.joltInterface = null;
@@ -67,6 +71,63 @@ export default class Game {
         this.audioInitialized = false;
         this.audioContext = null;
         this.vehicleScreechSounds = null;
+        this.vehicleScreechVolume = 0.3;
+
+        // dynaamisen moottoriäänien luontiin käytetty tekoälyä
+        // Chat GPT-5 ja Grok 4
+        this.engineSound = {
+            bands: [
+                { name: 'idle', rpm: 800, file: 'static/gameAssets/engine/SR20DET/idle.wav' },
+                { name: '2k', rpm: 2000, file: 'static/gameAssets/engine/SR20DET/2kRPM.wav' },
+                { name: '3k', rpm: 3000, file: 'static/gameAssets/engine/SR20DET/3kRPM.wav' },
+                { name: '4k', rpm: 4000, file: 'static/gameAssets/engine/SR20DET/4kRPM.wav' },
+                { name: '5k', rpm: 5000, file: 'static/gameAssets/engine/SR20DET/5kRPM.wav' },
+                { name: '6k', rpm: 6000, file: 'static/gameAssets/engine/SR20DET/6kRPM.wav' },
+                { name: '7k', rpm: 7000, file: 'static/gameAssets/engine/SR20DET/7kRPM.wav' },
+                { name: '8k', rpm: 8000, file: 'static/gameAssets/engine/SR20DET/8kRPM.wav' },
+            ],
+            limiter: { file: 'static/gameAssets/engine/SR20DET/limiter.wav' },
+            turboHiss: { file: 'static/gameAssets/engine/SR20DET/turbo_hiss2.wav' },
+
+            // runtime
+            layers: [],
+            limiterNode: null,
+            turboNode: null,
+            isReady: false,
+            maxRPM: 8000,
+            masterVolume: 0.2,
+            fadeSpeed: 0.15,
+            lastRPM: 0,
+            lastGear: null,
+            gearChangeCooldownMs: 200,
+            lastShiftAt: 0,
+
+            bandVolumes: {
+
+                'idle': 0.3,
+
+                '2k': 0.4,
+
+                '3k': 0.3,
+
+                '4k': 0.2,
+
+                '5k': 0.4,
+
+                '6k': 0.6,
+
+                '7k': 0.4,
+
+                '8k': 0.6,
+
+            },
+
+            limiterMultiplier: 0.6,
+
+            turboMultiplier: 1.0,
+
+            baseTurboVolume: 0.3
+        };
 
 
         // player
@@ -77,11 +138,21 @@ export default class Game {
         this.playerController = null;
         this.keyState = {};
         this.playerId = window.playerId;
+        this.playerTune = window.playerTune || null;
+        this.playerUsername = window.playerUsername || null;
         this.playerActive = false;
         this.lastActivityTime = Date.now();
+        this.playerLocation = window.playerLocation || null;
+
+        this.floorY = -0.3;
+        this.fallThreshold = 10;
+        this.heightThreshold = 50;
+        this.resetPromptShown = false;
 
         // other players
         this.otherPlayers = new Map();
+        this.playerNames = new Map();
+        this.playerTunes = new Map();
 
         // vehicle physics and rendering
         this.vehicle = null;
@@ -282,10 +353,25 @@ export default class Game {
             });
 
             this.scene = new THREE.Scene();
-            this.scene.background = new THREE.Color(0xffd577);
 
-            this.scene.add(new THREE.AmbientLight(0x303b5e));
-            const dirLight = new THREE.DirectionalLight(0xffcc77, 3);
+            // Create gradient background
+            const canvas = document.createElement('canvas');
+            canvas.width = 512;
+            canvas.height = 512;
+            const context = canvas.getContext('2d');
+            const gradient = context.createLinearGradient(0, canvas.height, 0, 0);
+            gradient.addColorStop(0, '#888FC7');
+            gradient.addColorStop(0.9, '#CC749C');
+            gradient.addColorStop(0.99, '#F3D0BA');
+            gradient.addColorStop(1, '#ffffff');
+            context.fillStyle = gradient;
+            context.fillRect(0, 0, canvas.width, canvas.height);
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.minFilter = THREE.LinearFilter;
+            this.scene.background = texture;
+
+            this.scene.add(new THREE.AmbientLight(0x888FC7));
+            const dirLight = new THREE.DirectionalLight(0xF3D0BA, 3);
             dirLight.position.set(10, 5, 5);
             this.scene.add(dirLight);
 
@@ -322,6 +408,7 @@ export default class Game {
             });
 
             this.texLoader = new THREE.TextureLoader();
+
             this.scene.fog = new THREE.Fog(0x303b5e, 0, 300);
 
             this.listener = new THREE.AudioListener();
@@ -349,6 +436,9 @@ export default class Game {
                         if (this.camera) {
                             this.camera.add(this.listener);
                         }
+
+                        this.camera.add(this.audioGloabal);
+
 
                         const soundFiles = {
                             toast: 'static/gameAssets/shifter.wav',
@@ -569,7 +659,7 @@ export default class Game {
                 this.tempQuat,
                 this.Jolt.EMotionType_Static,
                 LAYER_NON_MOVING,
-                0xc7c7c7,
+                0xEEEBE3,
             );
 
             this.Jolt.destroy(groundShapeSettings);
@@ -873,6 +963,53 @@ export default class Game {
         return compoundSettings;
     }
 
+    // dynaamisen moottoriäänien luontiin käytetty tekoälyä
+    // Chat GPT-5 ja Grok 4
+    initEngineLayers(minRPM, maxRPM) {
+        if (!this.audioContext || !this.listener || !this.vehicleMesh) return;
+
+        const es = this.engineSound;
+        es.maxRPM = maxRPM || es.maxRPM;
+
+        try {
+            es.layers = es.bands.map((b) => {
+                const pa = new THREE.Audio(this.listener);
+                pa.autoplay = false;
+                pa.setLoop(true);
+                this.audioGloabal.add(pa);
+                this.audioLoader.load(b.file, (buffer) => {
+                    pa.setBuffer(buffer);
+                    pa.setVolume(0.0);
+                    if (!pa.isPlaying) pa.play();
+                });
+                return { audio: pa, name: b.name, rpm: b.rpm, gain: 0.0 };
+            });
+
+            es.limiterNode = new THREE.Audio(this.listener);
+            es.limiterNode.setLoop(true);
+            this.audioGloabal.add(es.limiterNode);
+            this.audioLoader.load(es.limiter.file, (buf) => {
+                es.limiterNode.setBuffer(buf);
+                es.limiterNode.setVolume(0.0);
+                es.limiterNode.play();
+            });
+
+            es.turboNode = new THREE.Audio(this.listener);
+
+
+            es.turboNode.setLoop(false);
+            this.audioGloabal.add(es.turboNode);
+            this.audioLoader.load(es.turboHiss.file, (buf) => {
+                es.turboNode.setBuffer(buf);
+                es.turboNode.setVolume(es.baseTurboVolume * es.masterVolume * es.turboMultiplier);
+            });
+
+            es.isReady = true;
+        } catch (e) {
+            console.error('initEngineLayers error:', e);
+        }
+    }
+
     initWheelSounds(wheelIndex) {
         if (!this.vehicleScreechSounds) {
             if (!this.audioContext || !this.listener || !this.vehicleMesh) {
@@ -886,9 +1023,9 @@ export default class Game {
 
             try {
                 this.vehicleScreechSounds = {
-                    start: new THREE.PositionalAudio(this.listener),
-                    loop: new THREE.PositionalAudio(this.listener),
-                    stop: new THREE.PositionalAudio(this.listener),
+                    start: new THREE.Audio(this.listener),
+                    loop: new THREE.Audio(this.listener),
+                    stop: new THREE.Audio(this.listener),
                     wheelStates: [
                         { state: 'idle', currentVolume: 0 },
                         { state: 'idle', currentVolume: 0 },
@@ -905,30 +1042,21 @@ export default class Game {
                     sounds.start.setBuffer(this.soundEffects.screechStart);
                     sounds.start.setVolume(0);
                     sounds.start.setLoop(false);
-                    sounds.start.setRefDistance(10);
-                    sounds.start.setRolloffFactor(2);
-                    sounds.start.setMaxDistance(50);
-                    this.vehicleMesh.add(sounds.start);
+                    this.audioGloabal.add(sounds.start);
                 }
 
                 if (this.soundEffects.screechLoop) {
                     sounds.loop.setBuffer(this.soundEffects.screechLoop);
                     sounds.loop.setVolume(0);
                     sounds.loop.setLoop(true);
-                    sounds.loop.setRefDistance(10);
-                    sounds.loop.setRolloffFactor(2);
-                    sounds.loop.setMaxDistance(50);
-                    this.vehicleMesh.add(sounds.loop);
+                    this.audioGloabal.add(sounds.loop);
                 }
 
                 if (this.soundEffects.screechStop) {
                     sounds.stop.setBuffer(this.soundEffects.screechStop);
                     sounds.stop.setVolume(0);
                     sounds.stop.setLoop(false);
-                    sounds.stop.setRefDistance(10);
-                    sounds.stop.setRolloffFactor(2);
-                    sounds.stop.setMaxDistance(50);
-                    this.vehicleMesh.add(sounds.stop);
+                    this.audioGloabal.add(sounds.stop);
                 }
 
                 sounds.start.onEnded = () => {
@@ -955,7 +1083,6 @@ export default class Game {
 
         return this.vehicleScreechSounds;
     }
-
     createUnitCylinder(
         radius = 0.05,
         material = new THREE.MeshPhongMaterial({ color: 0x222222 }),
@@ -976,49 +1103,52 @@ export default class Game {
     createVehicle() {
         this.uiManager.setState(State.LOADING);
 
+        const t = this.playerTune || {};
         // dimensions
-        const wheelRadius = 0.55;
-        const wheelWidth = 0.6;
+        const wheelRadius = t.wheel_radius ?? 0.55;
+        const wheelWidth = t.wheel_width ?? 0.6;
 
         const halfVehicleLength = 4.445;
         const halfVehicleWidth = 1.695;
         const halfVehicleHeight = 0.9;
         const wheelBase = halfVehicleLength / 1.83;
 
-        const wheelOffset = -0.2;
-        const wheelOffsetVertical = -0.64;
-        const wheelOffsetLongitudal = 0.4;
+        const wheelOffset = t.wheel_offset ?? -0.2;
+        const wheelOffsetVertical = t.wheel_vertical_offset ?? -0.64;
+        const wheelOffsetLongitudal = t.wheel_longitudal_offset ?? 0.4;
 
-        const maxSteerAngle = this.degreesToRadians(60);
+        const maxSteerAngle = this.degreesToRadians(
+            t.max_steering_angle ?? 60
+        );
 
         // multipliers
-        const suspensionMinLength = 0.4;
-        const suspensionMaxLength = 1;
-        const suspensionPreloadLenght = 1;
-        const suspensionStiffness = 1;
-        const suspensionDamping = 1;
+        const suspensionMinLength = t.suspension_lenght_min ?? 0.4;
+        const suspensionMaxLength = t.suspension_lenght_max ?? 1;
+        const suspensionPreloadLenght = t.suspension_preload ?? 1;
+        const suspensionStiffness = t.suspension_stiffness ?? 1;
+        const suspensionDamping = t.suspension_damping ?? 1;
         const suspensionFrequency = 1;
-        const frontTyreLateralFriction = 15;
-        const frontTyreLongitudalFriction = 1;
-        const rearTyreLateralFriction = 2;
-        const rearTyreLongitudalFriction = 15;
+
+        const frontTyreLateralFriction = t.front_tyre_lateral_friction ?? 15;
+        const frontTyreLongitudalFriction = t.front_tyre_longitudal_friction ?? 1;
+        const rearTyreLateralFriction = t.rear_tyre_lateral_friction ?? 2;
+        const rearTyreLongitudalFriction = t.rear_tyre_longitudal_friction ?? 15;
 
         // powertrain
         const transmissionMode = this.Jolt.ETransmissionMode_Auto;
-        const fourWheelDrive = false;
-        const torqueSplitRatio = 1.4;
-        const differentialLimitedSlipRatio = 1.3;
-        const antiRollbar = true;
+        const fourWheelDrive = t.four_wheel_drive ?? false;
+        const torqueSplitRatio = t.torque_split_ratio ?? 1.4;
+        const differentialLimitedSlipRatio = t.differential_limited_slip_ratio ?? 1.3;
+        const antiRollbar = t.antirollbar ?? true;
 
-        const maxEngineTorque = 2500.0;
-        const clutchStrength = 1000.0;
-        const minRPM = 400;
-        const maxRPM = 8000;
-        const damperMass = 1.0;
-        const flywheelMass = 1.0;
+        const maxEngineTorque = t.max_engine_torque ?? 2500.0;
+        const clutchStrength = t.clutch_strenght ?? 1000.0;
+        const minRPM = t.min_rpm ?? 400;
+        const maxRPM = t.max_rpm ?? 8000;
+        const damperMass = t.damper_mass ?? 1.0;
+        const flywheelMass = t.flywheel_mass ?? 1.0;
 
-        const vehicleMass = 1200.0;
-
+        const vehicleMass = t.vehicle_mass ?? 1200.0;
         const FL_WHEEL = 0;
         const FR_WHEEL = 1;
         const BL_WHEEL = 2;
@@ -1030,41 +1160,39 @@ export default class Game {
         this.tempRVec.Set(10, 0, -30);
         this.tempQuat.Set(0, 180, 0, 1);
         try {
-            const carShapeSettings = new this.Jolt
-                .OffsetCenterOfMassShapeSettings(
-                    new this.Jolt.Vec3(0, -halfVehicleHeight, 0),
-                    this.createCarShape(
-                        halfVehicleWidth,
-                        halfVehicleHeight,
-                        halfVehicleLength,
-                    ),
-                );
+            const carShapeSettings = new this.Jolt.OffsetCenterOfMassShapeSettings(
+                new this.Jolt.Vec3(0, -halfVehicleHeight, 0),
+                this.createCarShape(halfVehicleWidth, halfVehicleHeight, halfVehicleLength),
+            );
 
-            let carBody = null;
-            Promise.all([
+            return Promise.all([
                 new Promise((resolve, reject) => {
-                    this.gltfLoader.load(
-                        "static/gameAssets/s15_body.glb",
-                        resolve,
-                        undefined,
-                        reject,
-                    );
+                    this.gltfLoader.load("static/gameAssets/s15_body.glb", resolve, undefined, reject);
                 }),
                 new Promise((resolve, reject) => {
-                    this.gltfLoader.load(
-                        "static/gameAssets/s15_wheel_l.glb",
-                        resolve,
-                        undefined,
-                        reject,
-                    );
+                    this.gltfLoader.load("static/gameAssets/s15_wheel_l.glb", resolve, undefined, reject);
                 }),
                 new Promise((resolve, reject) => {
-                    this.gltfLoader.load(
-                        "static/gameAssets/s15_wheel_r.glb",
-                        resolve,
-                        undefined,
-                        reject,
-                    );
+                    this.gltfLoader.load("static/gameAssets/s15_wheel_r.glb", resolve, undefined, reject);
+                }),
+                new Promise((resolve) => {
+                    const files = [
+                        'static/gameAssets/engine/SR20DET/idle.wav',
+                        'static/gameAssets/engine/SR20DET/2kRPM.wav',
+                        'static/gameAssets/engine/SR20DET/3kRPM.wav',
+                        'static/gameAssets/engine/SR20DET/4kRPM.wav',
+                        'static/gameAssets/engine/SR20DET/5kRPM.wav',
+                        'static/gameAssets/engine/SR20DET/6kRPM.wav',
+                        'static/gameAssets/engine/SR20DET/7kRPM.wav',
+                        'static/gameAssets/engine/SR20DET/8kRPM.wav',
+                        'static/gameAssets/engine/SR20DET/limiter.wav',
+                        'static/gameAssets/engine/SR20DET/turbo_hiss2.wav',
+                    ];
+                    let pending = files.length;
+                    const done = () => { if (--pending <= 0) resolve(); };
+                    files.forEach((path) => {
+                        this.audioLoader.load(path, () => done(), () => { }, () => done());
+                    });
                 }),
             ]).then(([carGltf, wheelGltfL, wheelGltfR]) => {
                 console.log("Car and wheel models loaded successfully");
@@ -1083,7 +1211,7 @@ export default class Game {
                 carModel.add(follow);
                 goal.add(this.camera);
 
-                carBody = this.createAndAddBody(
+                let carBody = this.createAndAddBody(
                     carShapeSettings,
                     this.tempRVec,
                     this.tempQuat,
@@ -1272,6 +1400,55 @@ export default class Game {
                 this.vehicleBody = carBody;
                 this.vehicleMesh = carModel;
 
+                if (this.playerLocation) {
+                    const p = this.playerLocation;
+
+                    const clampedY = Math.max(this.floorY + 0.5, p.position_y);
+                    const pos = new this.Jolt.RVec3(p.position_x, clampedY, p.position_z);
+                    const rot = new this.Jolt.Quat(
+                        p.rotation_x,
+                        p.rotation_y,
+                        p.rotation_z,
+                        p.rotation_w
+                    );
+
+                    this.bodyInterface.SetPositionAndRotation(
+                        this.vehicleBody.GetID(),
+                        pos,
+                        rot,
+                        this.Jolt.EActivation_Activate
+                    );
+
+                    this.Jolt.destroy(pos);
+                    this.Jolt.destroy(rot);
+
+                    const newPos = this.wrapVec3(this.vehicleBody.GetPosition());
+                    const newRot = this.wrapQuat(this.vehicleBody.GetRotation());
+                    this.vehicleMesh.position.copy(newPos);
+                    this.vehicleMesh.quaternion.copy(newRot);
+                } else {
+
+                    const clampedY = Math.max(this.floorY + 0.5, 0);
+                    const pos = new this.Jolt.RVec3(0, clampedY, 0);
+                    const rot = new this.Jolt.Quat(0, 0, 0, 1);
+
+                    this.bodyInterface.SetPositionAndRotation(
+                        this.vehicleBody.GetID(),
+                        pos,
+                        rot,
+                        this.Jolt.EActivation_Activate
+                    );
+
+                    this.Jolt.destroy(pos);
+                    this.Jolt.destroy(rot);
+
+                    const newPos = this.wrapVec3(this.vehicleBody.GetPosition());
+                    const newRot = this.wrapQuat(this.vehicleBody.GetRotation());
+                    this.vehicleMesh.position.copy(newPos);
+                    this.vehicleMesh.quaternion.copy(newRot);
+
+                }
+
                 const callbacks = new this.Jolt.VehicleConstraintCallbacksJS();
                 callbacks.GetCombinedFriction = (
                     wheelIndex,
@@ -1300,6 +1477,8 @@ export default class Game {
                 this.vehicleEngine = this.playerController.GetEngine();
                 this.vehicleTransmission = this.playerController
                     .GetTransmission();
+
+                this.initEngineLayers(minRPM, maxRPM);
 
                 const controllerCallbacks = new this.Jolt
                     .WheeledVehicleControllerCallbacksJS();
@@ -1335,7 +1514,7 @@ export default class Game {
 
                         const slipThreshold = 1;
                         const wheelVolume = slipMagnitude > slipThreshold
-                            ? Math.min((slipMagnitude - slipThreshold) * 1, 1.0)
+                            ? Math.min((slipMagnitude - slipThreshold) * this.vehicleScreechVolume, this.vehicleScreechVolume)
                             : 0;
 
                         sounds.wheelStates[wheelIndex].currentVolume = wheelVolume;
@@ -1356,7 +1535,6 @@ export default class Game {
                                     sounds.maxVolume = maxVolume;
                                     sounds.start.setVolume(maxVolume);
                                     sounds.start.play();
-                                    console.log('Vehicle starting screech');
                                 }
                                 break;
 
@@ -1618,7 +1796,7 @@ export default class Game {
     }
 
     prePhysicsUpdate() {
-        if (!this.vehicle) return;
+        if (!this.vehicle || !this.playerController) return;
         try {
             const input = this.input;
             let forward = 0.0,
@@ -1698,10 +1876,102 @@ export default class Game {
 
             this.currentRPM = this.vehicleEngine.GetCurrentRPM();
 
+            this.updateEngineLayers(this.currentRPM);
+
+            this.detectGearShiftAndTurbo();
+
             const maxRPM = this.vehicleEngine.get_mMaxRPM();
             this.uiManager.updateRpmGauge(this.currentRPM, maxRPM);
         } catch (error) {
             this.uiManager.setState(State.ERROR, error.message);
+        }
+    }
+
+    // dynaamisen moottoriäänien luontiin käytetty tekoälyä
+    // Chat GPT-5 ja Grok 4
+    updateEngineLayers(rpm) {
+        const es = this.engineSound;
+        if (!es.isReady || !es.layers.length) return;
+
+        const maxRpm = es.maxRPM || 8000;
+        const minRpm = 600; // alle tämän toistaa idleä
+        const r = Math.max(minRpm, Math.min(rpm, maxRpm));
+
+        let lower = es.layers[0];
+        let upper = es.layers[es.layers.length - 1];
+        for (let i = 0; i < es.layers.length - 1; i++) {
+            const a = es.layers[i];
+            const b = es.layers[i + 1];
+            if (r >= a.rpm && r <= b.rpm) {
+                lower = a;
+                upper = b;
+                break;
+            }
+            if (r < es.layers[0].rpm) {
+                lower = es.layers[0];
+                upper = es.layers[1];
+                break;
+            }
+        }
+
+        const span = Math.max(1, upper.rpm - lower.rpm);
+        const alpha = Math.max(0, Math.min(1, (r - lower.rpm) / span));
+
+        es.layers.forEach((layer) => {
+            let target = 0;
+            if (layer === lower) target = (1 - alpha);
+            else if (layer === upper) target = alpha;
+
+            layer.gain += (target - layer.gain) * es.fadeSpeed;
+            const vol = layer.gain * es.masterVolume * (es.bandVolumes[layer.name] || 1.0);
+
+            try {
+                layer.audio.setVolume(vol);
+            } catch { }
+        });
+
+        const limiterThreshold = maxRpm * 0.97;
+        const limiterGainTarget = r >= limiterThreshold ? Math.min(0.6, (r - limiterThreshold) / (maxRpm - limiterThreshold)) : 0.0;
+        const curLimiterVol = es.limiterNode.getVolume?.() || 0.0;
+        const newLimiterVol = curLimiterVol + (limiterGainTarget - curLimiterVol) * (es.fadeSpeed * 0.5);
+        es.limiterNode.setVolume(newLimiterVol * es.masterVolume * es.limiterMultiplier);
+
+
+        es.lastRPM = rpm;
+    }
+
+    // dynaamisen moottoriäänien luontiin käytetty tekoälyä
+    // Chat GPT-5 ja Grok 4
+    detectGearShiftAndTurbo() {
+        const es = this.engineSound;
+        if (!es.isReady) return;
+
+        const now = performance.now();
+        let currentGear = null;
+        try {
+            currentGear = this.vehicleTransmission?.GetCurrentGear?.();
+        } catch { }
+        if (currentGear !== null && currentGear !== undefined) {
+            if (es.lastGear === null) es.lastGear = currentGear;
+            if (currentGear !== es.lastGear && (now - es.lastShiftAt) > es.gearChangeCooldownMs) {
+                es.lastGear = currentGear;
+                es.lastShiftAt = now;
+                try {
+                    es.turboNode.stop();
+                } catch { }
+                try {
+                    es.turboNode.play();
+                } catch { }
+            }
+            return;
+        }
+
+        const drop = es.lastRPM - this.currentRPM;
+        const bigDrop = drop > 300;
+        if (bigDrop && (now - es.lastShiftAt) > es.gearChangeCooldownMs) {
+            es.lastShiftAt = now;
+            try { es.turboNode.stop(); } catch { }
+            try { es.turboNode.play(); } catch { }
         }
     }
 
@@ -1788,23 +2058,94 @@ export default class Game {
         }
     }
 
+    checkOutOfBoundsAndPromptReset() {
+        if (!this.vehicleBody || this.resetPromptShown) return;
+
+        const pos = this.wrapVec3(this.vehicleBody.GetPosition());
+        const dy = pos.y - this.floorY;
+
+        const tooLow = dy < -this.fallThreshold;
+        const tooHigh = dy > this.heightThreshold;
+
+        if (!tooLow && !tooHigh) return;
+
+        this.resetPromptShown = true;
+
+        const reason = tooLow ? "below the floor" : "too high above the map";
+
+        this.uiManager.addUiElement(`
+        <div class="game-pop">
+            <button class="close-pop" title="Close">&times;</button>
+            <h2>Reset position?</h2>
+            <p>Your car seems to be ${reason}. Do you want to reset to a safe spawn location?</p>
+            <div style="margin-top: 1rem; display: flex; gap: 1rem;">
+                <button id="reset-pos-yes" class="button">Yes, reset</button>
+                <button id="reset-pos-no" class="button button-secondary">No</button>
+            </div>
+        </div>
+    `);
+
+        setTimeout(() => {
+            const yesBtn = document.getElementById("reset-pos-yes");
+            const noBtn = document.getElementById("reset-pos-no");
+
+            if (yesBtn) {
+                yesBtn.addEventListener("click", () => {
+                    this.resetPlayerPositionToSafeSpawn();
+                }, { once: true });
+            }
+            if (noBtn) {
+                noBtn.addEventListener("click", () => {
+                    this.resetPromptShown = false;
+                }, { once: true });
+            }
+        }, 0);
+    }
+
+    resetPlayerPositionToSafeSpawn() {
+        if (!this.vehicleBody || !this.bodyInterface) return;
+
+        const safePos = new this.Jolt.RVec3(10, 1, -30);
+        const safeRot = new this.Jolt.Quat(0, 0, 0, 1);
+
+        this.bodyInterface.SetPositionAndRotation(
+            this.vehicleBody.GetID(),
+            safePos,
+            safeRot,
+            this.Jolt.EActivation_Activate
+        );
+
+        this.Jolt.destroy(safePos);
+        this.Jolt.destroy(safeRot);
+
+        const newPos = this.wrapVec3(this.vehicleBody.GetPosition());
+        const newRot = this.wrapQuat(this.vehicleBody.GetRotation());
+        this.vehicleMesh.position.copy(newPos);
+        this.vehicleMesh.quaternion.copy(newRot);
+
+        this.uiManager.addToastMessage("Position reset to safe spawn.");
+
+        this.resetPromptShown = false;
+    }
+
     async updateOtherPlayers(players) {
         const seenIds = new Set();
 
         for (const playerData of players) {
-            seenIds.add(playerData.player_id);
+            const pid = playerData.player_id;
+            seenIds.add(pid);
+            if (pid === this.playerId) continue;
 
-            if (playerData.player_id === this.playerId) continue;
+            const name = this.playerNames.get(pid) || playerData.name || `Player ${pid}`;
+            const tune = this.playerTunes.get(pid) || null;
+            let remotePlayer = this.otherPlayers.get(pid);
 
-            let remotePlayer = this.otherPlayers.get(playerData.player_id);
             if (!remotePlayer) {
-                remotePlayer = new RemotePlayer(
-                    this,
-                    playerData,
-                    PACKET_INTERVAL,
-                    this.debugMode
-                );
-                this.otherPlayers.set(playerData.player_id, remotePlayer);
+                remotePlayer = new RemotePlayer(this, { ...playerData, name, tune }, PACKET_INTERVAL, this.debugMode);
+                this.otherPlayers.set(pid, remotePlayer);
+            } else {
+                if (name && remotePlayer.name !== name) remotePlayer.setName(name);
+                if (tune) remotePlayer.applyTune(tune);
             }
 
             remotePlayer.updateState(playerData);
@@ -1812,34 +2153,43 @@ export default class Game {
 
         for (const [id, player] of this.otherPlayers) {
             if (!seenIds.has(id)) {
-                player.remove();
+                try { player.remove(); } catch (e) { this.uiManager.addDebugLog("error", e?.message || String(e)); }
                 this.otherPlayers.delete(id);
             }
         }
     }
 
     animate() {
+        this.checkOutOfBoundsAndPromptReset();
         requestAnimationFrame(this.animate.bind(this));
 
-        const deltaTime = this.clock.getDelta();
+        if (!this.isWindowFocused) {
+            if (this.controls) this.controls.update();
+            this.renderer.render(this.scene, this.camera);
+            return;
+        }
+
+        let deltaTime = this.clock.getDelta();
+
+        if (deltaTime > this.maxAccumulatedTime) {
+            deltaTime = this.maxAccumulatedTime;
+        }
+
+        const clampedDelta = Math.min(deltaTime, this.maxDeltaTime);
         try {
             this.checkActivity();
 
             this.prePhysicsUpdate();
-
-            this.updatePhysics(deltaTime);
-
+            this.updatePhysics(clampedDelta);
             this.handleCamera();
-
             this.updateRpmGauge();
 
             const currentTime = Date.now();
             for (const remotePlayer of this.otherPlayers.values()) {
-                remotePlayer.predict(currentTime, deltaTime, this.latency);
+                remotePlayer.predict(currentTime, clampedDelta, this.latency);
             }
 
             if (this.controls) this.controls.update();
-
             this.renderer.render(this.scene, this.camera);
         } catch (error) {
             this.uiManager.setState(State.ERROR, `Animation error: ${error.message}`);
@@ -1860,7 +2210,7 @@ export default class Game {
         cubeSize = 2.0,
         currentLayer = 0,
     ) {
-        this.tempRVec.Set(30, 0, -30);
+        this.tempRVec.Set(100, 0.5, 120);
         basePosition = this.tempRVec;
 
         if (currentLayer >= layers) {
@@ -1960,18 +2310,15 @@ export default class Game {
     }
 
     websocketConnect() {
-        //  this.uiManager.setState(State.LOADING);
         this.uiManager.updateNetworkStatus(NetworkState.CONNECTING, this.latency);
         const wsUrl = `wss://${window.location.host}/ws`;
         console.log(wsUrl);
         this.ws = new WebSocket(wsUrl);
-        if (!this.ws) {
-            throw new Error("WebSocket creation failed");
-        }
+        if (!this.ws) throw new Error("WebSocket creation failed");
 
         let counter = 0;
 
-        const cleanup = () => {
+        const wsCleanup = () => {
             if (this.sendInterval) {
                 clearInterval(this.sendInterval);
                 this.sendInterval = null;
@@ -1981,33 +2328,143 @@ export default class Game {
         this.ws.addEventListener("error", (error) => {
             this.uiManager.setState(State.ERROR, error);
             this.uiManager.updateNetworkStatus(NetworkState.DISCONNECTED, this.latency);
-            cleanup();
+            wsCleanup();
         });
 
-        this.ws.addEventListener("message", async (event) => {
-            const buffer = event.data.arrayBuffer
-                ? await event.data.arrayBuffer()
-                : event.data;
+        this.ws.addEventListener("open", () => {
+            this.uiManager.addDebugLog("info", "Websocket connected");
+            this.uiManager.setState(State.READY);
+            this.uiManager.updateNetworkStatus(NetworkState.CONNECTED, this.latency);
 
+            try {
+                this.ws.send(JSON.stringify({ type: "roster_request" }));
+                this.ws.send(JSON.stringify({ type: "tunes_request" }));
+            } catch (e) {
+                this.uiManager.addDebugLog("error", `Failed to request roster: ${e}`);
+            }
+
+            if (this.sendInterval) clearInterval(this.sendInterval);
+
+            this.sendInterval = setInterval(() => {
+                if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+                    ++counter;
+
+                    let data;
+                    if (
+                        isNaN(this.playerId) ||
+                        isNaN(this.playerPosition.x) ||
+                        isNaN(this.playerPosition.y) ||
+                        isNaN(this.playerPosition.z) ||
+                        isNaN(this.playerRotation.x) ||
+                        isNaN(this.playerRotation.y) ||
+                        isNaN(this.playerRotation.z) ||
+                        isNaN(this.playerRotation.w) ||
+                        isNaN(this.playerVelocity.x) ||
+                        isNaN(this.playerVelocity.y) ||
+                        isNaN(this.playerVelocity.z)
+                    ) {
+                    } else {
+                        data = new Float64Array([
+                            this.playerId,
+                            this.playerPosition.x,
+                            this.playerPosition.y,
+                            this.playerPosition.z,
+                            this.playerRotation.x,
+                            this.playerRotation.y,
+                            this.playerRotation.z,
+                            this.playerRotation.w,
+                            this.playerVelocity.x,
+                            this.playerVelocity.y,
+                            this.playerVelocity.z,
+                            this.playerActive ? 1.0 : 0.0,
+                            Date.now(),
+                        ]);
+
+                        try {
+                            this.ws.send(data.buffer);
+                        } catch (e) {
+                            this.uiManager.addDebugLog("error", `WebSocket send failed: ${e.message}`);
+                        }
+                    }
+                } else {
+                    this.log("info", "Websocket not open, not sending messages");
+                    wsCleanup();
+                }
+            }, PACKET_INTERVAL);
+        });
+
+        // Pelaajien nimet lähetetään erillisinä viesteinä tekstinä serveriltä aina kun tarpeellista. Niitä kuunnellaan tässä.
+        this.ws.addEventListener("message", async (event) => {
+            if (typeof event.data === "string") {
+                try {
+                    const msg = JSON.parse(event.data);
+                    if (msg.type === "roster") {
+                        this.playerNames.clear();
+                        for (const p of msg.players || []) {
+                            this.playerNames.set(p.id, p.name);
+                        }
+                        this.rosterVersion = msg.version ?? 0;
+                        this.uiManager.addDebugLog("info", `Roster synced (${this.playerNames.size} players)`);
+                        for (const [pid, remote] of this.otherPlayers) {
+                            const name = this.playerNames.get(pid) || `Player ${pid}`;
+                            remote.setName(name);
+                        }
+                    } else if (msg.type === "roster_update") {
+                        for (const p of msg.players || []) {
+                            this.playerNames.set(p.id, p.name);
+                        }
+                        this.rosterVersion = msg.version ?? (this.rosterVersion ?? 0) + 1;
+                        this.uiManager.addDebugLog("info", `Roster updated (${msg.players?.length ?? 0} changes)`);
+                    } else if (msg.type === "tunes") {
+                        for (const p of msg.players || []) {
+                            this.playerTunes.set(p.id, p.tune);
+                            const rp = this.otherPlayers.get(p.id);
+                            if (rp && p.tune) {
+                                rp.applyTune(p.tune);
+                            }
+                        }
+                        this.tunesVersion = msg.version ?? 0;
+                        this.uiManager.addDebugLog("info", `Tunes synced (${this.playerTunes.size} players)`);
+                    } else if (msg.type === "tunes_update") {
+                        for (const p of msg.players || []) {
+                            this.playerTunes.set(p.id, p.tune);
+                            const rp = this.otherPlayers.get(p.id);
+                            if (rp && p.tune) {
+                                rp.applyTune(p.tune);
+                            }
+                        }
+                        this.tunesVersion = msg.version ?? (this.tunesVersion ?? 0) + 1;
+                        this.uiManager.addDebugLog("info", `Tunes updated (${msg.players?.length ?? 0} changes)`);
+                    }
+                    return;
+                } catch (e) {
+                    this.uiManager.addDebugLog("error", `Bad roster message: ${e}`);
+                    return;
+                }
+            }
+            const buffer = event.data.arrayBuffer ? await event.data.arrayBuffer() : event.data;
             const data = new Float64Array(buffer);
 
             const valuesPerPlayer = 12;
-            const playerCount = data.length / valuesPerPlayer;
+
+            const totalPayloadValues = data.length - 1;
+            const playerCount = totalPayloadValues > 0 ? totalPayloadValues / valuesPerPlayer : 0;
 
             const players = [];
 
             const serverTimestamp = data[0];
             this.latency = Date.now() - serverTimestamp;
             this.uiManager.addDebugLog("info", `Round-trip latency: ${this.latency}ms`);
-
             this.uiManager.updateNetworkStatus(NetworkState.CONNECTED, this.latency);
 
-            if (data.length > 1) {
-                for (let i = 0; i < playerCount + 1; i++) {
+            if (playerCount > 0) {
+                for (let i = 0; i < playerCount; i++) {
                     // timestamp + pelaajakohtaisen datan pituus
-                    const baseIndex = 1 + (i * valuesPerPlayer);
+                    const baseIndex = 1 + i * valuesPerPlayer;
+                    const id = data[baseIndex];
                     const player = {
                         player_id: data[baseIndex],
+                        name: this.playerNames.get(id) || `Player ${id}`,
                         position: {
                             x: data[baseIndex + 1],
                             y: data[baseIndex + 2],
@@ -2032,91 +2489,16 @@ export default class Game {
             this.updateOtherPlayers(players);
         });
 
-        this.ws.addEventListener("open", () => {
-            this.uiManager.addDebugLog("info", "Websocket connected");
-            this.uiManager.setState(State.READY);
-            this.uiManager.updateNetworkStatus(NetworkState.CONNECTED, this.latency);
-
-            if (this.sendInterval) {
-                clearInterval(this.sendInterval);
-            }
-
-            this.sendInterval = setInterval(() => {
-                if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-                    ++counter;
-
-                    let packet;
-
-                    let data;
-                    if (
-                        isNaN(this.playerId) ||
-                        isNaN(this.playerPosition.x) ||
-                        isNaN(this.playerPosition.y) ||
-                        isNaN(this.playerPosition.z) ||
-                        isNaN(this.playerRotation.x) ||
-                        isNaN(this.playerRotation.y) ||
-                        isNaN(this.playerRotation.z) ||
-                        isNaN(this.playerRotation.w) ||
-                        isNaN(this.playerVelocity.x) ||
-                        isNaN(this.playerVelocity.y) ||
-                        isNaN(this.playerVelocity.z)
-                    ) {
-                        packet = null;
-                    } else {
-                        packet = {
-                            player_id: Number(this.playerId),
-                            position: this.playerPosition,
-                            rotation: this.playerRotation,
-                            velocity: this.playerVelocity,
-                            active: this.playerActive,
-                        };
-
-                        data = new Float64Array([
-                            this.playerId,
-                            this.playerPosition.x,
-                            this.playerPosition.y,
-                            this.playerPosition.z,
-                            this.playerRotation.x,
-                            this.playerRotation.y,
-                            this.playerRotation.z,
-                            this.playerRotation.w,
-                            this.playerVelocity.x,
-                            this.playerVelocity.y,
-                            this.playerVelocity.z,
-                            this.playerActive ? 1.0 : 0.0,
-                            Date.now(),
-                        ]);
-
-                        const packetStr = JSON.stringify(packet, null, 2);
-
-                        try {
-                            this.ws.send(data.buffer);
-                        } catch (e) {
-                            this.uiManager.addDebugLog(
-                                "error",
-                                `WebSocket send failed: ${e.message}`,
-                            );
-                        }
-                    }
-                } else {
-                    this.log(
-                        "info",
-                        "Websocket not open, not sending messages",
-                    );
-                    cleanup();
-                }
-            }, PACKET_INTERVAL);
-        });
-
         this.ws.addEventListener("close", (event) => {
             this.uiManager.updateNetworkStatus(NetworkState.DISCONNECTED, this.latency);
             this.uiManager.addDebugLog(
                 "info",
                 `websocket closed. ${event.code} ${event.reason}`,
             );
-            cleanup();
+            wsCleanup();
         });
     }
+
     async init() {
         try {
             this.uiManager = new UIManager(this);
@@ -2125,7 +2507,19 @@ export default class Game {
             this.uiManager.addDebugLog("info", "Debug log initialized");
             this.uiManager.addDebugLog("info", `Player id: ${this.playerId}`);
 
+            window.addEventListener("focus", () => {
+                this.isWindowFocused = true;
+                if (this.clock) {
+                    this.clock.getDelta();
+                }
+            });
+
+            window.addEventListener("blur", () => {
+                this.isWindowFocused = false;
+            });
+
             try {
+
                 this.websocketConnect();
             } catch (e) {
                 throw e;
@@ -2176,7 +2570,7 @@ export default class Game {
             }
             // try { await this.createBuildings(); } catch (e) { throw e }
             try {
-                this.createVehicle();
+                await this.createVehicle();
             } catch (e) {
                 throw e;
             }
@@ -2186,9 +2580,6 @@ export default class Game {
                 throw e;
             }
 
-            // cars spawn position. gltf loading happens async so the other translations messes it up.
-            this.tempRVec.Set(-40, 0, -40);
-            this.tempQuat.Set(0, 0, 0, 1);
 
             try {
                 this.setupControls();
@@ -2208,6 +2599,17 @@ export default class Game {
             }, 2000);
 
             setTimeout(() => {
+                if (!window.isAuthenticated) {
+                    this.uiManager.addUiElement(`
+                <div class="game-pop">
+                    <button class="close-pop" title="Close">&times;</button>
+                    <h2>Play with your own car setup</h2>
+                    <p>You are currently playing as a guest. Create an account to save your tune and profile.</p>
+                    <br>
+                    <a class="button" href="/user/signup">Go to signup</a>
+                </div>
+                `);
+                }
                 if (!this.isMobile) {
                     this.uiManager.addToastMessage("Use Spacebar for handbrake.");
                 } else {
@@ -2309,6 +2711,14 @@ document.addEventListener("DOMContentLoaded", () => {
     game.init();
 
     window.addEventListener("beforeunload", () => {
-        //game.cleanup();
+        if (game.sendInterval) {
+            clearInterval(game.sendInterval);
+            game.sendInterval = null;
+        }
+        if (game.ws && game.ws.readyState === WebSocket.OPEN) {
+            try {
+                game.ws.close();
+            } catch (e) { }
+        }
     });
 });

@@ -54,8 +54,6 @@ export default class UIManager {
                         <circle cx="100" cy="100" r="95" fill="#222" stroke="#444" stroke-width="2"/>
                         <g id="tickMarks"></g>
                         <text x="100" y="180" text-anchor="middle" fill="#808080" font-size="18">RPM</text>
-                        <text x="50" y="165" text-anchor="middle" fill="#808080" font-size="12">0</text>
-                        <text x="160" y="90" text-anchor="middle" fill="#808080" font-size="12">8000</text>
                         <line id="rpm-needle" x1="100" y1="100" x2="100" y2="35" stroke="#f00" stroke-width="4"/>
                         <circle cx="100" cy="100" r="6" fill="#fff"/>
                     </svg>

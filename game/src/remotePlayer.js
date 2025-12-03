@@ -94,6 +94,9 @@ export default class RemotePlayer {
         this.debugStartSphere = null;
         this.debugText = null;
 
+        this.tune = new Tune(playerData.tune || {});
+
+        this.wheels = [];
         this.initialized = false;
         this.init();
     }
@@ -103,6 +106,7 @@ export default class RemotePlayer {
             await this.loadModels();
             await this.createVehicle();
             this.createNameTag();
+            this.setName(this.name);
             this.createSleepIcon();
 
             if (this.debugMode) {
@@ -142,24 +146,37 @@ export default class RemotePlayer {
         this.vehicleMesh = this.models.body.clone();
         this.vehicleMesh.frustumCulled = false;
 
+        this.vehicleMesh.position.copy(this.position);
+        this.vehicleMesh.quaternion.copy(this.rotation);
+        this.game.scene.add(this.vehicleMesh);
+
+        this.buildWheels(this.tune);
+    }
+    buildWheels(tune) {
+        if (this.wheels && this.wheels.length) {
+            for (const w of this.wheels) {
+                if (w.parent) w.parent.remove(w);
+            }
+        }
+        this.wheels = [];
+
         // mittojen asettelu noudattaa eri logiikkaa kuin pelaajan auto,
         // mutta samasta kaavasta saadaan tehtyä myös remoteplayerille auto.
-        const tune = new Tune();
         const wheelPosX = tune.halfVehicleWidth - tune.wheelWidth / 3;
         const wheelPosY = tune.halfVehicleHeight + tune.wheelOffsetVertical;
         const wheelPosZ = tune.wheelBase;
 
-        this.wheels = [];
+        const longi = tune.wheelLongitudalOffset;
+
         const wheelPositions = [
-            { x: wheelPosX, y: wheelPosY, z: wheelPosZ + tune.wheelOffsetLongitudal, left: true, front: true },
-            { x: -wheelPosX, y: wheelPosY, z: wheelPosZ + tune.wheelOffsetLongitudal, left: false, front: true },
-            { x: wheelPosX, y: wheelPosY, z: -wheelPosZ + tune.wheelOffsetLongitudal / 2, left: true, front: false },
-            { x: -wheelPosX, y: wheelPosY, z: -wheelPosZ + tune.wheelOffsetLongitudal / 2, left: false, front: false },
+            { x: wheelPosX, y: wheelPosY, z: wheelPosZ + longi, left: true, front: true },
+            { x: -wheelPosX, y: wheelPosY, z: wheelPosZ + longi, left: false, front: true },
+            { x: wheelPosX, y: wheelPosY, z: -wheelPosZ + longi / 2, left: true, front: false },
+            { x: -wheelPosX, y: wheelPosY, z: -wheelPosZ + longi / 2, left: false, front: false }
         ];
 
         wheelPositions.forEach((pos) => {
-            const wheel = (pos.left ? this.models.wheelL : this.models.wheelR)
-                .clone();
+            const wheel = (pos.left ? this.models.wheelL : this.models.wheelR).clone();
             wheel.position.set(pos.x, pos.y, pos.z);
             wheel.rotation.y = pos.left ? -Math.PI / 2 : Math.PI / 2;
             wheel.userData.front = pos.front;
@@ -169,10 +186,14 @@ export default class RemotePlayer {
             this.vehicleMesh.add(wheel);
             this.wheels.push(wheel);
         });
+    }
 
-        this.vehicleMesh.position.copy(this.position);
-        this.vehicleMesh.quaternion.copy(this.rotation);
-        this.game.scene.add(this.vehicleMesh);
+    applyTune(tuneObj) {
+        if (!tuneObj) return;
+        this.tune = new Tune(tuneObj);
+        if (this.vehicleMesh) {
+            this.buildWheels(this.tune);
+        }
     }
 
     createNameTag() {
@@ -200,6 +221,22 @@ export default class RemotePlayer {
         this.nameSprite.scale.set(5, 1.25, 1);
         this.nameSprite.position.y = 3.5;
         this.vehicleMesh.add(this.nameSprite);
+    }
+
+    setName(name) {
+        this.name = name || `Player ${this.id}`;
+        if (!this.nameSprite) return;
+        const canvas = this.nameSprite.material.map.image;
+        const ctx = canvas.getContext("2d");
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.font = "bold 48px Arial";
+        ctx.fillStyle = "#ffffff";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(this.name, canvas.width / 2, canvas.height / 2);
+        this.nameSprite.material.map.needsUpdate = true;
     }
 
     createSleepIcon() {
@@ -650,7 +687,7 @@ export default class RemotePlayer {
         this.wheels.forEach((wheel) => {
             wheel.userData.rollAngle = (wheel.userData.rollAngle || 0) + wheelRotationSpeed;
 
-            if (wheel.userData.isLeft) {
+            if (wheel.userData.left) {
                 wheel.rotation.x = wheel.userData.rollAngle - Math.PI / 2;
             } else {
                 wheel.rotation.x = -wheel.userData.rollAngle + Math.PI / 2;
@@ -685,49 +722,58 @@ export default class RemotePlayer {
 }
 
 export class Tune {
-    constructor() {
-        this.wheelRadius = 0.55;
-        this.wheelWidth = 0.6;
+    constructor(raw = {}) {
+        this.wheelRadius = pick(raw.wheel_radius, raw.wheelRadius, 0.55);
+        this.wheelWidth = pick(raw.wheel_width, raw.wheelWidth, 0.6);
 
         this.halfVehicleLength = 4.445;
         this.halfVehicleWidth = 1.695;
         this.halfVehicleHeight = 0.9;
         this.wheelBase = this.halfVehicleLength / 1.83;
 
-        this.wheelOffset = -0.2;
-        this.wheelOffsetVertical = -0.64;
-        this.wheelOffsetLongitudal = 0.4;
+        this.wheelOffset = pick(raw.wheel_offset, raw.wheelOffset, -0.2);
+        this.wheelOffsetVertical = pick(raw.wheel_vertical_offset, raw.wheelVerticalOffset, -0.64);
+        this.wheelLongitudalOffset = pick(raw.wheel_longitudal_offset, raw.wheelLongitudalOffset, 0.4);
 
-        this.maxSteerAngle = this.degreesToRadians(60);
+        this.maxSteerAngle = this.degreesToRadians(pick(raw.max_steering_angle, raw.maxSteeringAngle, 60));
 
-        this.suspensionMinLength = 0.4;
-        this.suspensionMaxLength = 1;
-        this.suspensionPreloadLenght = 1;
-        this.suspensionStiffness = 1;
-        this.suspensionDamping = 1;
+        this.suspensionMinLength = pick(raw.suspension_lenght_min, raw.suspensionLenghtMin, 0.4);
+        this.suspensionMaxLength = pick(raw.suspension_lenght_max, raw.suspensionLenghtMax, 1);
+        this.suspensionPreloadLenght = pick(raw.suspension_preload, raw.suspensionPreload, 1);
+        this.suspensionStiffness = pick(raw.suspension_stiffness, raw.suspensionStiffness, 1);
+        this.suspensionDamping = pick(raw.suspension_damping, raw.suspensionDamping, 1);
         this.suspensionFrequency = 1;
-        this.frontTyreLateralFriction = 15;
-        this.frontTyreLongitudalFriction = 1;
-        this.rearTyreLateralFriction = 2;
-        this.rearTyreLongitudalFriction = 15;
+
+        // Match SQL defaults (15, 1, 2, 15)
+        this.frontTyreLateralFriction = pick(raw.front_tyre_lateral_friction, raw.frontTyreLateralFriction, 15);
+        this.frontTyreLongitudalFriction = pick(raw.front_tyre_longitudal_friction, raw.frontTyreLongitudalFriction, 1);
+        this.rearTyreLateralFriction = pick(raw.rear_tyre_lateral_friction, raw.rearTyreLateralFriction, 2);
+        this.rearTyreLongitudalFriction = pick(raw.rear_tyre_longitudal_friction, raw.rearTyreLongitudalFriction, 15);
 
         this.transmissionModeAuto = true;
-        this.fourWheelDrive = false;
-        this.torqueSplitRatio = 1.4;
-        this.differentialLimitedSlipRatio = 1.3;
-        this.antiRollbar = true;
+        this.fourWheelDrive = pick(raw.four_wheel_drive, raw.fourWheelDrive, false);
+        this.torqueSplitRatio = pick(raw.torque_split_ratio, raw.torqueSplitRatio, 1.4);
+        this.differentialLimitedSlipRatio = pick(raw.differential_limited_slip_ratio, raw.differentialLimitedSlipRatio, 1.3);
+        this.antiRollbar = pick(raw.antirollbar, raw.antiRollbar, true);
 
-        this.maxEngineTorque = 2500.0;
-        this.clutchStrength = 1000.0;
-        this.minRPM = 400;
-        this.maxRPM = 8000;
-        this.damperMass = 1.0;
-        this.flywheelMass = 1.0;
+        this.maxEngineTorque = pick(raw.max_engine_torque, raw.maxEngineTorque, 2500.0);
+        this.clutchStrength = pick(raw.clutch_strenght, raw.clutchStrength, 1000.0);
+        this.minRPM = pick(raw.min_rpm, raw.minRpm, 400);
+        this.maxRPM = pick(raw.max_rpm, raw.maxRpm, 8000);
+        this.damperMass = pick(raw.damper_mass, raw.damperMass, 1.0);
+        this.flywheelMass = pick(raw.flywheel_mass, raw.flywheelMass, 1.0);
 
-        this.vehicleMass = 1200.0;
+        this.vehicleMass = pick(raw.vehicle_mass, raw.vehicleMass, 1200.0);
     }
 
     degreesToRadians(degrees) {
         return (degrees * Math.PI) / 180;
     }
+}
+
+function pick(...vals) {
+    for (const v of vals) {
+        if (v !== undefined && v !== null) return v;
+    }
+    return undefined;
 }
