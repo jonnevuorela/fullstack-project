@@ -27,7 +27,7 @@ body {
     background-image:
 
       radial-gradient( transparent 30%, black 60%),
-      url("/static/car_mmo.png");
+      url("/static/img/car_mmo.png");
 
 }
 

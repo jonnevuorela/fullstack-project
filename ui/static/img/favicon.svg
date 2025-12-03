@@ -1,0 +1,91 @@
+<?xml version="1.0"?>
+<svg xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns="http://www.w3.org/2000/svg" xmlns:cc="http://creativecommons.org/ns#" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:svg="http://www.w3.org/2000/svg" id="svg6182" viewBox="0 0 600 600" version="1.1">
+  <defs id="defs6184">
+    <linearGradient id="linearGradient6788" x1="346" gradientUnits="userSpaceOnUse" y1="294.36" gradientTransform="translate(-113.01 345.75)" x2="450" y2="502.36">
+      <stop id="stop6784" stop-color="#60c" offset="0"/>
+      <stop id="stop6786" stop-color="#60c" stop-opacity="0" offset="1"/>
+    </linearGradient>
+    <filter id="filter6800" color-interpolation-filters="sRGB">
+      <feGaussianBlur id="feGaussianBlur6802" stdDeviation="8.61411"/>
+    </filter>
+    <radialGradient id="radialGradient6828" gradientUnits="userSpaceOnUse" cy="302.35" cx="423" gradientTransform="matrix(-.98077 .44223 -.40973 -.90869 961.75 390.04)" r="156.03">
+      <stop id="stop6824" stop-color="#333" offset="0"/>
+      <stop id="stop6826" offset="1"/>
+    </radialGradient>
+    <radialGradient id="radialGradient6843" gradientUnits="userSpaceOnUse" cy="41.751" cx="304" gradientTransform="matrix(.53143 2.946 2.5877 -.40672 178.35 -254.71)" r="73.486">
+      <stop id="stop6839" stop-color="#fb8b00" offset="0"/>
+      <stop id="stop6841" stop-color="#fb8b00" stop-opacity="0" offset="1"/>
+    </radialGradient>
+    <radialGradient id="radialGradient6853" gradientUnits="userSpaceOnUse" cy="155.95" cx="395" gradientTransform="matrix(1.1525 -1.9525 -2.2984 -1.182 114.01 1859.2)" r="73.486">
+      <stop id="stop6849" stop-color="#fdca01" offset="0"/>
+      <stop id="stop6851" stop-color="#fdca01" stop-opacity="0" offset="1"/>
+    </radialGradient>
+    <linearGradient id="linearGradient6903" x1="353" gradientUnits="userSpaceOnUse" y1="270.36" gradientTransform="translate(-113.01 345.75)" x2="530" y2="576.52">
+      <stop id="stop6897" stop-color="#036" offset="0"/>
+      <stop id="stop6899" stop-color="#60c" offset="1"/>
+    </linearGradient>
+    <filter id="filter6959" color-interpolation-filters="sRGB">
+      <feGaussianBlur id="feGaussianBlur6961" stdDeviation="18.396868"/>
+    </filter>
+  </defs>
+  <g id="layer1" transform="translate(0 -452.36)">
+    <path id="path6804" stroke-linejoin="round" d="m577 304.86a151 150.5 0 1 1 -302 0 151 150.5 0 1 1 302 0z" fill-rule="evenodd" transform="translate(-134.01 453.75)" stroke="#161b25" stroke-linecap="round" stroke-width="10.052" fill="url(#radialGradient6828)"/>
+    <path id="path6208" stroke-width="0" fill-rule="evenodd" fill="#036" d="m293.7 607.66c-62.88 0-117.17 36.756-142.59 89.938 15.942-26.328 41.061-59.207 74.562-70.344l34.656 96.875c0.0937 1.304 0.14612 2.5877 0.0937 3.7812 7.416-6.3497 16.73-10.564 26.969-11.656-1.5336-0.92679-2.9734-2.4704-4.4062-4.125l-44-93c14.796-7.4128 31.672-10.16 48.5-10.219 19.072-0.0665 38.09 3.3173 53.969 7.2188l-44.625 96c-1.253 1.836-2.4224 3.0484-3.5312 3.8438 11.938 0.14007 22.847 4.5103 31.344 11.656-0.56479-1.8142-0.48276-4.0983-0.3125-6.4688l34.656-96.875c33.501 11.137 58.621 43.985 74.562 70.312l-99.438 36.344c-2.4542 0.46318-4.3073 0.48218-5.7188 0.15625 8.6559 8.9408 14 21.104 14 34.531 0 26.378-20.562 47.969-46.531 49.594 1.5241 0.5907 3.1593 2.0362 4.9688 4.6875l44.25 95.156c7.1377-2.4529 14.053-5.3757 20.688-8.7812l-36.188-98.969c-1.5478-8.2009 1.8768-9.8186 6.4688-9.9062 1.0597-0.0202 2.207 0.0433 3.3438 0.125l96.875 34.656c-0.75384 2.2676-1.6182 4.4969-2.5625 6.6875 11.475-21.892 18-46.819 18-73.25 0-12.962-1.5871-25.539-4.5312-37.594 5.4517 27.926 7.4746 61.762-6.0312 88.719l-93-44c-4.595-3.9792-8.4841-8.0536 0-13.844l95.156-44.219c-21.22-62.25-80.19-107.03-149.62-107.03zm-142.59 89.938c-9.854 20.61-15.375 43.663-15.375 68.031 0 51.548 24.708 97.321 62.906 126.16-19.016-14.85-36.937-33.905-44.594-56.938l96.875-34.656c2.3152-0.16629 4.581-0.24117 6.375 0.28125-7.0882-7.2082-12.006-16.556-13.656-27-0.90745 1.1182-2.0741 2.2088-3.3125 3.2812l-93 44c-15.814-31.564-10.344-72.58-3-102.47l96 44.625c1.1216 0.76548 2.0027 1.5094 2.7188 2.2188 0.11697-11.695 4.2866-22.413 11.156-30.844-1.0515 0.0105-2.237-0.10713-3.6562-0.375l-99.438-36.312zm109.56 106c0.51337 1.4752 0.57273 3.5372 0.0312 6.4062l-35.75 97.875c20.792 10.071 44.097 15.75 68.75 15.75 13.633 0 26.881-1.722 39.5-4.9688-28.205 5.6694-62.781 7.9964-90.219-5.75l44-93c1.7103-1.975 3.4378-3.806 5.3125-4.5938-12.051-0.0967-23.071-4.4926-31.625-11.719zm143.69 74.781c-9.9776 9.2624-20.918 17.231-31.281 23.906 11.423-6.6483 21.91-14.707 31.281-23.906z"/>
+    <path id="path6780" stroke-width="0" fill-rule="evenodd" fill="url(#linearGradient6788)" d="m292.71 609.66c-61.686 0-114.94 36.058-139.89 88.23 15.639-25.828 40.281-58.082 73.147-69.008l33.998 95.035c0.0919 1.2793 0.14336 2.5386 0.0919 3.7095 7.2752-6.2292 16.412-10.364 26.457-11.435-1.5045-0.90918-2.9169-2.4234-4.3226-4.0467l-43.164-91.234c14.515-7.272 31.071-9.9672 47.579-10.025 18.71-0.0653 37.367 3.2543 52.944 7.0817l-43.778 94.177c-1.2292 1.8011-2.3764 2.9905-3.4642 3.7708 11.712 0.1374 22.413 4.4247 30.749 11.435-0.55405-1.7797-0.47358-4.0205-0.30656-6.3459l33.998-95.035c32.865 10.925 57.507 43.15 73.147 68.977l-97.549 35.654c-2.4076 0.45439-4.2255 0.47303-5.6102 0.15328 8.4916 8.771 13.734 20.703 13.734 33.876 0 25.878-20.172 47.058-45.648 48.652 1.4952 0.57948 3.0993 1.9976 4.8744 4.5985l43.41 93.349c7.0022-2.4063 13.786-5.2736 20.295-8.6145l-35.5-97.089c-1.5184-8.0451 1.8411-9.6322 6.3459-9.7182 1.0396-0.0199 2.1651 0.0424 3.2803 0.12263l95.035 33.998c-0.73953 2.2246-1.5875 4.4115-2.5138 6.5605 11.257-21.476 17.658-45.93 17.658-71.859 0-12.715-1.5569-25.054-4.4452-36.88 5.3482 27.396 7.3326 60.589-5.9167 87.034l-91.234-43.164c-4.5078-3.9036-8.323-7.9007 0-13.581l93.349-43.379c-20.82-61.08-78.67-105.01-146.77-105.01zm-139.89 88.23c-9.6669 20.219-15.083 42.833-15.083 66.739 0 50.569 24.239 95.473 61.712 123.76-18.655-14.568-36.236-33.262-43.747-55.856l95.035-33.998c2.2712-0.16314 4.494-0.23661 6.254 0.27591-6.9536-7.0714-11.778-16.242-13.397-26.487-0.8902 1.097-2.0347 2.1669-3.2496 3.2189l-91.234 43.164c-15.514-30.965-10.147-71.201-2.943-100.52l94.177 43.778c1.1003 0.75093 1.9646 1.4807 2.6671 2.1766 0.11475-11.473 4.2052-21.988 10.944-30.258-1.0315 0.0102-2.1945-0.10512-3.5868-0.36789l-97.549-35.623zm107.48 103.99c0.50362 1.4472 0.56184 3.47 0.0306 6.2846l-35.071 96.016c20.397 9.8799 43.26 15.451 67.444 15.451 13.374 0 26.37-1.6893 38.75-4.8744-27.669 5.5618-61.589 7.8446-88.506-5.6408l43.164-91.234c1.6778-1.9375 3.3726-3.7337 5.2116-4.5065-11.822-0.0949-22.633-4.4073-31.024-11.496zm140.96 73.361c-9.7881 9.0865-20.521 16.904-30.687 23.452 11.206-6.5221 21.494-14.428 30.687-23.452z"/>
+    <path id="path6792" stroke-linejoin="round" d="m576 422.86a174 160.5 0 1 1 -348 0 174 160.5 0 1 1 348 0z" fill-opacity="0" transform="matrix(.88793 0 0 .96262 -62.462 355.56)" stroke="#2e1877" stroke-linecap="round" stroke-width="13.196"/>
+    <path id="path6794" stroke-linejoin="round" d="m447 423.36a40 36 0 1 1 -80 0 40 36 0 1 1 80 0z" fill-opacity="0" transform="matrix(1.1239 0 0 1.221 -163.43 249.21)" stroke="#2e1877" stroke-linecap="round" stroke-width="12.2"/>
+    <path id="path6796" stroke-linejoin="round" d="m576 422.86a174 160.5 0 1 1 -348 0 174 160.5 0 1 1 348 0z" fill-opacity="0" transform="matrix(.89899 0 0 .97460 -66.907 350.49)" stroke="#0c051f" stroke-linecap="round" stroke-width="3.9016"/>
+    <path id="path6798" stroke-linejoin="round" d="m576 422.86a174 160.5 0 1 1 -348 0 174 160.5 0 1 1 348 0z" fill-opacity="0" transform="matrix(.82514 0 0 .89454 -37.219 384.35)" filter="url(#filter6800)" stroke="#161b25" stroke-linecap="round" stroke-width="11.7"/>
+    <path id="path6830" stroke-width="0" fill-rule="evenodd" fill="#ffdf99" d="m295.5 584.99c102.9 0 186.32 78.411 186.32 175.14 0 96.724-83.42 175.14-186.32 175.14s-186.32-78.411-186.32-175.14c0-96.724 83.42-175.14 186.32-175.14zm0 29.189c-85.753 0-155.3 65.342-155.3 145.95 0 80.604 69.544 145.95 155.3 145.95 85.753 0 155.3-65.342 155.3-145.95 0-80.604-69.544-145.95-155.3-145.95z"/>
+    <path id="path6835" stroke-width="0" fill-rule="evenodd" fill="url(#radialGradient6843)" d="m295.5 580.13c105.76 0 191.5 80.589 191.5 180s-85.737 180-191.5 180-191.5-80.589-191.5-180 85.737-180 191.5-180zm0 30c-88.135 0-159.61 67.157-159.61 150s71.476 150 159.61 150c88.135 0 159.61-67.157 159.61-150s-71.476-150-159.61-150z"/>
+    <path id="path6845" stroke-width="0" fill-rule="evenodd" fill="url(#radialGradient6853)" d="m295.5 580.13c105.76 0 191.5 80.589 191.5 180s-85.737 180-191.5 180-191.5-80.589-191.5-180 85.737-180 191.5-180zm0 30c-88.135 0-159.61 67.157-159.61 150s71.476 150 159.61 150c88.135 0 159.61-67.157 159.61-150s-71.476-150-159.61-150z"/>
+    <path id="path6855" stroke-width="0" fill-rule="evenodd" fill="url(#linearGradient6903)" d="m295.5 597.99c95.269 0 172.5 72.593 172.5 162.14 0 89.548-77.231 162.14-172.5 162.14s-172.5-72.593-172.5-162.14c0-89.548 77.231-162.14 172.5-162.14zm0 27.023c-79.391 0-143.78 60.494-143.78 135.12 0 74.623 64.384 135.12 143.78 135.12 79.391 0 143.78-60.494 143.78-135.12 0-74.623-64.384-135.12-143.78-135.12z"/>
+    <path id="path6859" stroke-width="0" fill-rule="evenodd" d="m295.5 489.89c158.78 0 287.5 120.99 287.5 270.24 0 149.24-128.72 270.27-287.5 270.27s-287.5-121.03-287.5-270.27c0-149.25 128.72-270.24 287.5-270.24zm0 45.039c-132.32 0-239.63 100.82-239.63 225.2 0 124.37 107.31 225.2 239.63 225.2s239.63-100.82 239.63-225.2c0-124.37-107.31-225.2-239.63-225.2z"/>
+    <path id="path6861" stroke-width="0" fill-rule="evenodd" d="m295.5 533.13c133.38 0 241.5 101.63 241.5 227 0 125.36-108.12 226.99-241.5 226.99s-241.5-101.63-241.5-226.99c0-125.37 108.12-227 241.5-227zm0 37.833c-111.15 0-201.29 84.692-201.29 189.16s90.138 189.16 201.29 189.16 201.29-84.692 201.29-189.16-90.138-189.16-201.29-189.16z"/>
+    <path id="path6863" stroke-width="0" fill-rule="evenodd" d="m295.5 557.57c119.02 0 215.5 90.689 215.5 202.56s-96.483 202.56-215.5 202.56-215.5-90.689-215.5-202.56 96.483-202.56 215.5-202.56zm0 33.76c-99.181 0-179.61 75.574-179.61 168.8 0 93.225 80.434 168.8 179.61 168.8 99.181 0 179.61-75.574 179.61-168.8 0-93.225-80.434-168.8-179.61-168.8z"/>
+    <path id="path6913" stroke-linejoin="round" d="m2500 346.36a624 602 0 1 1 -1248 0 624 602 0 1 1 1248 0z" fill-opacity="0" transform="matrix(.40507 0 0 .39329 -457.42 622.39)" filter="url(#filter6959)" stroke="#e2e6ee" stroke-linecap="round" stroke-width="8.7139"/>
+    <text id="text6963" font-size="14px" xml:space="preserve" line-height="125%" y="1524.1141" x="-1281.0139" font-family="Arial Black" fill="#000000">
+      <tspan id="tspan6965" y="1524.1141" x="-1281.0139"/>
+    </text>
+  </g>
+  <metadata>
+    <rdf:RDF>
+      <cc:Work>
+        <dc:format>image/svg+xml</dc:format>
+        <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
+        <cc:license rdf:resource="http://creativecommons.org/licenses/publicdomain/"/>
+        <dc:publisher>
+          <cc:Agent rdf:about="http://openclipart.org/">
+            <dc:title>Openclipart</dc:title>
+          </cc:Agent>
+        </dc:publisher>
+        <dc:title>wheel3</dc:title>
+        <dc:date>2010-07-23T06:55:05</dc:date>
+        <dc:description>Tyre, car, clip art, clipart, moto sports, parts, sports2010, wheel, </dc:description>
+        <dc:source>http://openclipart.org/detail/74389/wheel3-by-netalloy</dc:source>
+        <dc:creator>
+          <cc:Agent>
+            <dc:title>netalloy</dc:title>
+          </cc:Agent>
+        </dc:creator>
+        <dc:subject>
+          <rdf:Bag>
+            <rdf:li>Tyre</rdf:li>
+            <rdf:li>car</rdf:li>
+            <rdf:li>clip art</rdf:li>
+            <rdf:li>clipart</rdf:li>
+            <rdf:li>moto sports</rdf:li>
+            <rdf:li>parts</rdf:li>
+            <rdf:li>sports2010</rdf:li>
+            <rdf:li>wheel</rdf:li>
+          </rdf:Bag>
+        </dc:subject>
+      </cc:Work>
+      <cc:License rdf:about="http://creativecommons.org/licenses/publicdomain/">
+        <cc:permits rdf:resource="http://creativecommons.org/ns#Reproduction"/>
+        <cc:permits rdf:resource="http://creativecommons.org/ns#Distribution"/>
+        <cc:permits rdf:resource="http://creativecommons.org/ns#DerivativeWorks"/>
+      </cc:License>
+    </rdf:RDF>
+  </metadata>
+</svg>
