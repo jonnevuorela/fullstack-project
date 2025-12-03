@@ -105,3 +105,11 @@ func (m *UserModel) Get(id int) (*models.User, error) {
 	c := *u
 	return &c, nil
 }
+
+func (m *UserModel) UpdateSavedTune(userID int, tuneID int) error {
+	return nil
+}
+
+func (m *UserModel) Update(id int, username, email, password string) error {
+	return nil
+}

@@ -49,6 +49,7 @@ func newTestApplication(t *testing.T) *application {
 		users:          mocks.NewUserModelMock(),
 		players:        mocks.NewPlayerModelMock(),
 		locations:      mocks.NewLocationModelMock(),
+		tunes:          mocks.NewTuneModelMock(),
 		templateCache:  templateCache,
 		sessionManager: sessionManager,
 		formDecoder:    formDecoder,
