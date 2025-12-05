@@ -1,5 +1,6 @@
 ### "Build" commands
 ```
+cd game
 npm install
 npm run build
 ```
